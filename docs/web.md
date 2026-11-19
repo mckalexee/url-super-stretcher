@@ -163,7 +163,8 @@ An error that isn't a thrown response, which renders as a 500, gets none of them
 
 `src/web/entry.server.tsx` exports `handleError`, which React Router calls for an error that a
 loader, an action, or rendering throws. It logs `ssr.unhandled_error` with the path, and skips
-requests that the client aborted. Errors that happen after the HTML shell has started streaming
+requests that the client aborted. Every logged path goes through `loggablePath()` from
+`src/stretch/log-path.ts`, which writes a stretched link's path as `/to/*`. Errors that happen after the HTML shell has started streaming
 surface in `onError`, which logs them as `ssr.stream_error`. `isbot` detects crawlers, which get
 the complete document instead of a stream. `streamTimeout` gives deferred loader data five seconds.
 

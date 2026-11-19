@@ -90,6 +90,26 @@ export function normalizeHostname(hostname: string): string {
   return hostname.toLowerCase().replace(/\.$/, "");
 }
 
+// The limits that DNS sets on a name: 63 characters a label, and 253 for the whole name without
+// its trailing dot.
+const MAX_LABEL_LENGTH = 63;
+const MAX_HOSTNAME_LENGTH = 253;
+
+/**
+ * Reports whether a normalized hostname is one that DNS can hold: at most 253 characters, in
+ * labels of 1 to 63 characters. The URL parser accepts names that break these rules, such as
+ * `example.com..`, and they aren't harmless. The resolver behind the reputation check refuses
+ * to judge them, a second trailing dot gets past the exact match of a hostname ban, and a long
+ * enough name makes a `blocked-host:` key that KV rejects. Pass the result of
+ * `normalizeHostname`, because the one trailing dot that it drops is valid.
+ */
+export function isValidHostname(hostname: string): boolean {
+  return (
+    hostname.length <= MAX_HOSTNAME_LENGTH &&
+    hostname.split(".").every((label) => label.length >= 1 && label.length <= MAX_LABEL_LENGTH)
+  );
+}
+
 /**
  * Returns the KV key that bans a hostname: `blocked-host:` plus the normalized hostname. The
  * match is exact, so the key for `example.com` doesn't ban `www.example.com`.

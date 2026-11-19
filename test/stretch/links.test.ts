@@ -25,6 +25,11 @@ async function keyFor(path: string): Promise<string> {
   return `link:${hex.join("")}`;
 }
 
+const LABEL_63 = "a".repeat(63);
+// Three labels of 63 characters, three dots, and four characters of `.com` leave 57 for the
+// fourth label of a name that is exactly 253 characters long.
+const NAME_253 = `${LABEL_63}.${LABEL_63}.${LABEL_63}.${"a".repeat(57)}.com`;
+
 const fortyTwos: RandomSource = (bytes) => {
   bytes.fill(42);
 };
@@ -229,6 +234,38 @@ describe("resolveLink", () => {
   });
 });
 
+/** Writes a record straight to KV, the way anyone with access to the namespace can. */
+async function storeRecord(path: string, url: string): Promise<void> {
+  const record = { url, flavor: "ooo", path, createdAt: "2026-01-01T00:00:00.000Z" };
+  await env.LINKS.put(await keyFor(path), JSON.stringify(record));
+}
+
+describe("resolveLink for a record with a hostname that isn't valid", () => {
+  // `parseTarget` never lets such a hostname in, so only a record written some other way holds
+  // one. Its second trailing dot would dodge the ban's exact match, and the resolver can't judge
+  // the name.
+  it("reports a link to a banned hostname with a second trailing dot as removed", async () => {
+    await env.LINKS.put(blockedHostKey("banned.example.org"), "{}");
+    await storeRecord("/to/dodges-the-ban", "https://banned.example.org../x");
+
+    await expect(resolveLink(env.LINKS, "/to/dodges-the-ban")).resolves.toEqual({
+      state: "removed",
+    });
+  });
+
+  it.each([
+    ["an empty label", "https://malware.testcategory.com../"],
+    ["a label of 64 characters", `https://a${LABEL_63}.example.com/`],
+    ["more than 253 characters", `https://${"a.".repeat(300)}com/`],
+  ])("reports a link to a hostname with %s as removed", async (_, url) => {
+    await storeRecord("/to/not-a-valid-hostname", url);
+
+    await expect(resolveLink(env.LINKS, "/to/not-a-valid-hostname")).resolves.toEqual({
+      state: "removed",
+    });
+  });
+});
+
 describe("isHostBlocked", () => {
   it("is true only for a hostname with a blocked-host key", async () => {
     await env.LINKS.put("blocked-host:blocked.example", "{}");
@@ -299,6 +336,20 @@ describe("parseTarget", () => {
     ["a name under .local", "http://printer.local/"],
     ["a name under .internal", "https://wiki.corp.internal/page"],
     ["a private name in another letter case", "https://NAS.Local/"],
+    ["a name under .home.arpa", "http://nas.home.arpa/"],
+    ["home.arpa itself", "http://home.arpa/"],
+    ["a name under .lan", "http://printer.lan/"],
+    ["a single-label name", "http://router"],
+    ["a single-label name with a path", "http://intranet/admin"],
+    ["a single-label name with a trailing dot", "https://intranet./"],
+    ["a name with two trailing dots", "https://malware.testcategory.com../"],
+    ["a banned name's spelling with two trailing dots", "https://banned.example.org../"],
+    ["a URL on this site with two trailing dots", `http://${OWN_HOSTNAME}../to/x`],
+    ["a private name with two trailing dots", "http://x.localhost../"],
+    ["a name with an empty label in the middle", "https://example..com/"],
+    ["a name with a label of 64 characters", `https://a${LABEL_63}.example.com/`],
+    ["a name of 254 characters", `https://a${NAME_253}/`],
+    ["a name of 300 labels", `https://${"a.".repeat(300)}com/`],
   ])("rejects %s with a 400", (_, input) => {
     const error = rejection(input);
 
@@ -341,6 +392,22 @@ describe("parseTarget", () => {
       "message",
       expect.stringContaining("private network"),
     );
+    expect(rejection("http://intranet/admin")).toHaveProperty(
+      "message",
+      expect.stringContaining("private network"),
+    );
+    for (const input of [
+      "https://banned.example.org../",
+      `http://${OWN_HOSTNAME}../to/x`,
+      "http://x.localhost../",
+      `https://a${LABEL_63}.example.com/`,
+      `https://${"a.".repeat(300)}com/`,
+    ]) {
+      expect(rejection(input)).toHaveProperty(
+        "message",
+        expect.stringContaining("isn't a valid hostname"),
+      );
+    }
   });
 
   it("accepts a public name that only resembles a private one", () => {
@@ -351,6 +418,24 @@ describe("parseTarget", () => {
       "notlocalhost.example",
     );
     expect(parseTarget("https://1.2.3.example/", OWN_HOSTNAME).hostname).toBe("1.2.3.example");
+  });
+
+  it("accepts the longest label and the longest name that DNS allows", () => {
+    expect(parseTarget(`https://${LABEL_63}.example.com/`, OWN_HOSTNAME).hostname).toBe(
+      `${LABEL_63}.example.com`,
+    );
+    expect(NAME_253).toHaveLength(253);
+    expect(parseTarget(`https://${NAME_253}/`, OWN_HOSTNAME).hostname).toBe(NAME_253);
+    // The trailing dot of a fully qualified name doesn't count toward the limit.
+    expect(parseTarget(`https://${NAME_253}./`, OWN_HOSTNAME).hostname).toBe(`${NAME_253}.`);
+  });
+
+  it("accepts a public name that only resembles a local one", () => {
+    expect(parseTarget("https://lan.example.com/", OWN_HOSTNAME).hostname).toBe("lan.example.com");
+    expect(parseTarget("https://example.plan/", OWN_HOSTNAME).hostname).toBe("example.plan");
+    expect(parseTarget("https://home.arpa.example/", OWN_HOSTNAME).hostname).toBe(
+      "home.arpa.example",
+    );
   });
 
   it("keeps the rejected input out of the message", () => {

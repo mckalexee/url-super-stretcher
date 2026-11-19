@@ -12,7 +12,9 @@
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true },
+    // An invocation log records the whole request URL, and a stretched link's URL opens the page
+    // that shows its destination. The app's own request log has a redacted path instead.
+    "logs": { "enabled": true, "invocation_logs": false },
     "traces": { "enabled": true, "head_sampling_rate": 0.1 },
   },
   // The stretched links. Each record maps the hash of a long link to the URL it leads to. The

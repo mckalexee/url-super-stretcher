@@ -145,3 +145,7 @@ A private-site test also sets `WEB_ACCESS` to `private` with `useWebAccess()`, a
 
 `src/lib/log.ts` writes to `console`, so tests that expect a warning or an error spy on the
 console method and parse the JSON line. Restore spies with `vi.restoreAllMocks()` in `afterEach`.
+
+To assert what must never be logged, call `captureLogs()` from `test/helpers/logs.ts`. It spies
+on every console method and returns a reader for the lines, and `eventsIn()` parses the lines of
+one event.

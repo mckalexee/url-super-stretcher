@@ -63,10 +63,21 @@ export function loader() {
  * Stretches the submitted URL and stores the link. A rejected input comes back with status 400,
  * the visitor's values, and a message for the field at fault, so the form renders again with
  * nothing lost. A destination that was banned or that is on a security blocklist is rejected the
- * same way. A client that creates more than five links a minute gets status 429. Any other
- * failure propagates to the error boundary.
+ * same way. A client that creates more than five links a minute gets status 429. A method other
+ * than `POST` gets status 405 on the error page. Any other failure propagates to the error
+ * boundary.
  */
 export async function action({ request, context }: Route.ActionArgs) {
+  // React Router runs the action for `PUT`, `PATCH`, and `DELETE` too. The form only posts, so
+  // anything else is turned away before it reads the body or spends a rate limit token. The root
+  // route's `headers` export passes `Allow` to the error page.
+  if (request.method !== "POST") {
+    throw data(null, {
+      status: 405,
+      statusText: "Method Not Allowed",
+      headers: { Allow: "GET, HEAD, POST" },
+    });
+  }
   const { env } = context.get(cloudflareContext);
   const origin = new URL(request.url);
   const form = await request.formData();

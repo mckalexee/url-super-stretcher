@@ -7,7 +7,14 @@ import { HttpError } from "#lib/errors.ts";
 import { generateStretch } from "./flavors.ts";
 import type { FlavorId, RandomSource } from "./flavors.ts";
 import { LINK_PREFIX } from "./prefix.ts";
-import { blockedHostKey, linkKey, normalizeHostname, parseRecord, stretchOf } from "./records.ts";
+import {
+  blockedHostKey,
+  isValidHostname,
+  linkKey,
+  normalizeHostname,
+  parseRecord,
+  stretchOf,
+} from "./records.ts";
 import type { StretchedLink } from "./records.ts";
 
 // Longer URLs than this fail in some browsers and proxies, and a stretched link adds its own
@@ -27,7 +34,7 @@ const IPV4_LITERAL = /^\d+\.\d+\.\d+\.\d+$/;
 
 // Names that resolve only inside a machine or a private network. The resolver that judges
 // destinations can't see them, and a public link has no business pointing at them.
-const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal"];
+const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal", ".home.arpa", ".lan"];
 
 function parseUrl(text: string): URL | null {
   try {
@@ -37,17 +44,22 @@ function parseUrl(text: string): URL | null {
   }
 }
 
+// A name without a dot, such as `localhost`, `intranet`, or `router`, means something only to
+// the network that the visitor is on, so every single-label name is private. The dot in front of
+// the hostname lets a suffix match the bare name too, such as `home.arpa`.
 function isPrivateName(hostname: string): boolean {
-  return hostname === "localhost" || PRIVATE_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+  return (
+    !hostname.includes(".") || PRIVATE_SUFFIXES.some((suffix) => `.${hostname}`.endsWith(suffix))
+  );
 }
 
 /**
  * Turns what a visitor typed into the URL that the link leads to. Input without a scheme that
  * looks like a hostname gets `https://`. The function throws an `HttpError` with status 400, and
  * a message written for the page, when the input is empty, isn't a URL, isn't `http` or `https`,
- * carries a username or password, is longer than 2,048 characters, names an IP address or a
- * private-network hostname, or points at `ownHostname`. A stretched link that points at this site
- * can lead to itself forever.
+ * carries a username or password, is longer than 2,048 characters, names an IP address, a
+ * hostname that DNS can't hold, or a private-network hostname, or points at `ownHostname`. A
+ * stretched link that points at this site can lead to itself forever.
  */
 export function parseTarget(input: string, ownHostname: string): URL {
   const text = input.trim();
@@ -86,6 +98,15 @@ export function parseTarget(input: string, ownHostname: string): URL {
     throw new HttpError(
       400,
       "That URL uses an IP address instead of a name. We only stretch links to named sites. Numbers have to stay the length they are.",
+    );
+  }
+  // This comes before every check that compares names. A name such as `example.com..` keeps a
+  // trailing dot after normalization, so it would match neither this site's hostname, nor a
+  // private suffix, nor a ban.
+  if (!isValidHostname(hostname)) {
+    throw new HttpError(
+      400,
+      "That isn't a valid hostname. Each part between the dots needs 1 to 63 characters, and the whole name at most 253. We stretch links, not the rules of DNS.",
     );
   }
   if (isPrivateName(hostname)) {
@@ -162,14 +183,23 @@ export type LinkLookup =
 /**
  * Finds the link for a request's pathname plus search and says whether it still works. A link is
  * `removed` when its record was disabled or its destination's hostname was banned, so one
- * `blocked-host:` key takes down every link to that hostname.
+ * `blocked-host:` key takes down every link to that hostname. It's also `removed` when the
+ * record's hostname isn't one that `parseTarget` accepts as valid, because neither the ban's
+ * exact match nor the reputation check can judge such a name.
  */
 export async function resolveLink(kv: KVNamespace, pathAndQuery: string): Promise<LinkLookup> {
   const link = await findLink(kv, pathAndQuery);
   if (link === null) {
     return { state: "missing" };
   }
-  if (link.disabledAt !== undefined || (await isHostBlocked(kv, new URL(link.url).hostname))) {
+  const hostname = normalizeHostname(new URL(link.url).hostname);
+  // The validity check runs before the ban lookup, because a hostname that is too long makes a
+  // key that KV refuses to read.
+  if (
+    link.disabledAt !== undefined ||
+    !isValidHostname(hostname) ||
+    (await isHostBlocked(kv, hostname))
+  ) {
     return { state: "removed" };
   }
   return { state: "active", link };

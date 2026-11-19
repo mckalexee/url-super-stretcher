@@ -11,6 +11,7 @@ import { blockedHostKey, disableRecord, linkKey, stretchOf } from "#stretch/reco
 import type { StretchedLink } from "#stretch/records.ts";
 
 import { AUD, createAccessIssuer, useAccessVars, useWebAccess } from "../helpers/access.ts";
+import { captureLogs, eventsIn } from "../helpers/logs.ts";
 import { resolver, unreachableResolver, useResolver } from "../helpers/reputation.ts";
 import { longLinkIn, submitStretchForm } from "../helpers/stretch.ts";
 
@@ -42,6 +43,20 @@ function hostInHtml(hostname: string): string {
 async function disable(link: StretchedLink, reason?: string): Promise<void> {
   const record = disableRecord(link, new Date(), reason);
   await env.LINKS.put(await linkKey(stretchOf(link.path)!), JSON.stringify(record));
+}
+
+// In the flavors without a query string, the path is the whole link, and whoever has the link
+// can see where it leads. So no log line may hold the path, the stretch, or the ID in it.
+function expectLinkNotLogged(lines: string[], path: string): void {
+  const written = lines.join("\n");
+  expect(written).not.toContain(path);
+  expect(written).not.toContain(path.slice("/to/".length));
+  // The jargon and legalese flavors end with the ID as 32 hexadecimal digits. In the ooo flavor
+  // the whole stretch is the ID.
+  const id = /[0-9a-f]{32}$/.exec(path)?.[0] ?? path.slice("/to/".length);
+  expect(written).not.toContain(id);
+  // Whatever follows the prefix in a logged path is the fixed text.
+  expect(written).not.toMatch(/\/to\/[^*]/);
 }
 
 function expectLinkHeaders(response: Response): void {
@@ -234,18 +249,91 @@ describe("GET /to/* for a destination on the security blocklist", () => {
     expect((await view(link.path)).status).toBe(403);
   });
 
-  it("logs the hostname of a blocked view, and not the URL", async () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+  it("logs the hostname of a blocked view, and neither the URL nor the link", async () => {
+    const logs = captureLogs();
     network.use(resolver("malware.example"));
 
     await view(link.path);
 
-    const lines = info.mock.calls.map(([line]) => String(line));
-    const blocked = lines.filter((line) => line.includes('"stretch.view_blocked"'));
-    expect(blocked.map((line) => JSON.parse(line) as unknown)).toEqual([
+    const lines = logs();
+    expect(eventsIn(lines, "stretch.view_blocked")).toEqual([
       { level: "info", event: "stretch.view_blocked", hostname: "malware.example" },
     ]);
+    expect(eventsIn(lines, "http.request")).toEqual([
+      expect.objectContaining({ method: "GET", path: "/to/*", status: 403 }),
+    ]);
     expect(lines.join("\n")).not.toContain("secret-path");
+    expectLinkNotLogged(lines, link.path);
+  });
+
+  it("answers the route's data request with 403 and no URL", async () => {
+    network.use(resolver("malware.example"));
+
+    const response = await view(`${link.path}.data`);
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("Location")).toBeNull();
+    expectLinkHeaders(response);
+    const body = await response.text();
+    expect(body).toContain('"flagged"');
+    expect(body).toContain('"malware.example"');
+    expect(body).not.toContain("secret-path");
+    expect(body).not.toContain("https://malware.example");
+  });
+});
+
+describe("the logs of a view", () => {
+  it.for(["jargon", "legalese", "ooo"] as const)(
+    "leave out the path of a %s link that is shown",
+    async (id) => {
+      const link = await createLink(env.LINKS, new URL(TARGET), id);
+      expect(link.path).not.toContain("?");
+      const logs = captureLogs();
+
+      const responses = [await view(link.path), await view(`${link.path}.data`)];
+
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
+      const lines = logs();
+      expect(eventsIn(lines, "http.request")).toEqual([
+        expect.objectContaining({ path: "/to/*", status: 200 }),
+        expect.objectContaining({ path: "/to/*", status: 200 }),
+      ]);
+      expectLinkNotLogged(lines, link.path);
+    },
+  );
+
+  it("leave out the path of a link that isn't stored", async () => {
+    // A link that lost its last character is still most of a link.
+    const link = await createLink(env.LINKS, new URL(TARGET), "jargon");
+    const path = link.path.slice(0, -1);
+    const logs = captureLogs();
+
+    const response = await view(path);
+
+    expect(response.status).toBe(404);
+    const lines = logs();
+    expect(eventsIn(lines, "http.request")).toEqual([
+      expect.objectContaining({ path: "/to/*", status: 404 }),
+    ]);
+    expectLinkNotLogged(lines, path);
+  });
+
+  it("leave out the path of a link whose lookup fails", async () => {
+    const link = await createLink(env.LINKS, new URL(TARGET), "legalese");
+    vi.spyOn(env.LINKS, "get").mockRejectedValue(new Error("The namespace is down."));
+    const logs = captureLogs();
+
+    const response = await view(link.path);
+
+    expect(response.status).toBe(500);
+    const lines = logs();
+    expect(eventsIn(lines, "ssr.unhandled_error")).toEqual([
+      expect.objectContaining({ level: "error", path: "/to/*" }),
+    ]);
+    expect(eventsIn(lines, "http.request")).toEqual([
+      expect.objectContaining({ path: "/to/*", status: 500 }),
+    ]);
+    expectLinkNotLogged(lines, link.path);
   });
 });
 
@@ -267,6 +355,37 @@ describe("GET /to/* for a link that was taken down", () => {
     expect(page).not.toContain("removed.example");
     expect(page).not.toContain("phishing");
     expect(page).not.toContain(">Continue<");
+  });
+
+  it("answers the route's data request with 410 and no destination", async () => {
+    const link = await createLink(env.LINKS, new URL(removed), "legalese");
+    await disable(link, "phishing");
+
+    const response = await view(`${link.path}.data`);
+
+    expect(response.status).toBe(410);
+    expect(response.headers.get("Location")).toBeNull();
+    expectLinkHeaders(response);
+    const body = await response.text();
+    expect(body).toContain('"removed"');
+    expect(body).not.toContain("removed.example");
+    expect(body).not.toContain("phishing");
+  });
+
+  it("answers 410 for a stored hostname that isn't valid, without a lookup", async () => {
+    // A second trailing dot would dodge a ban's exact match and the resolver's judgment, so the
+    // page never shows such a destination, however its record came to exist.
+    const link = await createLink(env.LINKS, new URL("https://example.org/"), "ooo");
+    const record = { ...link, url: "https://banned.example.org../landing" };
+    await env.LINKS.put(await linkKey(stretchOf(link.path)!), JSON.stringify(record));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    network.use(unreachableResolver);
+
+    const response = await view(link.path);
+
+    expect(response.status).toBe(410);
+    expect(await response.text()).not.toContain("banned.example.org");
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("answers 410 for every link to a blocked hostname", async () => {

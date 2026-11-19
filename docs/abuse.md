@@ -12,9 +12,15 @@ that the site has, what each one catches and misses, and what to do when a repor
 | Takedown          | `scripts/takedown.ts`, `src/stretch/links.ts` | Disables one link, or bans a hostname and with it every link to that hostname. A removed link answers 410 and names no destination.                          | Anything that nobody reports. A subdomain or a second domain of a banned hostname, because a ban matches one exact hostname.                   |
 | Rate limit        | `src/web/routes/home.tsx`                     | Allows a client five new links a minute, keyed on its IP address.                                                                                            | A sender spread over many addresses. The count is approximate and separate in each Cloudflare location, so a burst can pass a few extra links. |
 
-Target validation in `parseTarget` also rejects IP addresses, `localhost`, and names that end in
-`.localhost`, `.local`, or `.internal`. The resolver can't judge them, and they cover private
-networks.
+Target validation in `parseTarget` also rejects IP addresses, names without a dot, such as
+`localhost` or `intranet`, and names that end in `.localhost`, `.local`, `.internal`,
+`.home.arpa`, or `.lan`. The resolver can't judge them, and they cover private networks.
+
+It also rejects a hostname that DNS can't hold: one with an empty label, such as
+`example.com..`, a label longer than 63 characters, or more than 253 characters in total. The
+URL parser accepts such names, the resolver refuses to judge them, and a second trailing dot
+would get past the exact match of a hostname ban. A stored record that holds such a hostname
+answers 410, like a link that was taken down.
 
 ### When the resolver fails
 

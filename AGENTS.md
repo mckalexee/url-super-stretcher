@@ -71,6 +71,8 @@ module outside the current directory through its `#` subpath with the file exten
 - `src/stretch/records.ts` and `src/stretch/takedown.ts` also run in Node.js, for
   `scripts/takedown.ts`. Keep bindings and other Workers-only APIs and types out of them.
 - A failed reputation check lets a link through. Never turn a resolver outage into an error.
+- Never log a stretched link's path, because the path is the link. Pass every request path that
+  you log through `loggablePath()` in `src/stretch/log-path.ts`.
 
 - Identity goes through `src/http/access.ts`. `ctx.access` is absent behind the static assets
   router in production, so `access.ts` verifies the `Cf-Access-Jwt-Assertion` header itself.

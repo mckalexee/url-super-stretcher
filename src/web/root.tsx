@@ -107,6 +107,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   401: "Sign in to see this page.",
   403: "You don't have access to this page.",
   404: "This page doesn't exist.",
+  405: "This page doesn't accept that method.",
 };
 
 // A route that throws `data({ message }, { status })` chose that message for the person reading

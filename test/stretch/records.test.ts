@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockedHostKey,
   disableRecord,
+  isValidHostname,
   linkKey,
   parseRecord,
   restoreRecord,
@@ -58,6 +59,29 @@ describe("blockedHostKey", () => {
     expect(blockedHostKey(new URL("https://bücher.example/").hostname)).toBe(
       "blocked-host:xn--bcher-kva.example",
     );
+  });
+});
+
+describe("isValidHostname", () => {
+  it.each([
+    "example.org",
+    "localhost",
+    "xn--bcher-kva.example",
+    `${"a".repeat(63)}.example`,
+    `${"a.".repeat(126)}a`,
+  ])("is true for %j", (hostname) => {
+    expect(isValidHostname(hostname)).toBe(true);
+  });
+
+  it.each([
+    ["an empty name", ""],
+    ["a trailing dot left after normalization", "example.org."],
+    ["a leading dot", ".example.org"],
+    ["an empty label in the middle", "example..org"],
+    ["a label of 64 characters", `${"a".repeat(64)}.example`],
+    ["a name of 254 characters", `${"a.".repeat(126)}aa`],
+  ])("is false for %s", (_, hostname) => {
+    expect(isValidHostname(hostname)).toBe(false);
   });
 });
 

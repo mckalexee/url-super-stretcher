@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FLAVORS } from "#stretch/flavors.ts";
 import { blockedHostKey } from "#stretch/records.ts";
 
+import { captureLogs, eventsIn } from "../helpers/logs.ts";
 import { cleanAnswer, RESOLVER_URL, resolver, useResolver } from "../helpers/reputation.ts";
 import { longLinkIn, submitStretchForm } from "../helpers/stretch.ts";
 
@@ -128,27 +129,37 @@ describe("POST /", () => {
     expect(await response.text()).toContain("<td>20<!-- --> characters</td>");
   });
 
-  it("logs the flavor and the lengths, and neither URL", async () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+  it.for(FLAVORS.map((flavor) => flavor.id))(
+    "logs the flavor and the lengths of a %s link, and neither URL",
+    async (id) => {
+      const logs = captureLogs();
 
-    const response = await submitStretchForm({
-      url: "https://example.org/reset?token=secret-value",
-      flavor: "tracking",
-    });
-    const longLink = longLinkIn(await response.text());
+      const response = await submitStretchForm({
+        url: "https://example.org/reset?token=secret-value",
+        flavor: id,
+      });
+      const longLink = longLinkIn(await response.text());
 
-    const lines = info.mock.calls.map(([line]) => String(line));
-    const created = lines.filter((line) => line.includes('"stretch.link_created"'));
-    expect(created).toHaveLength(1);
-    expect(JSON.parse(created[0]!)).toEqual({
-      level: "info",
-      event: "stretch.link_created",
-      flavor: "tracking",
-      originalLength: 44,
-      stretchedLength: longLink.length,
-    });
-    expect(lines.join("\n")).not.toContain("secret-value");
-  });
+      const lines = logs();
+      expect(eventsIn(lines, "stretch.link_created")).toEqual([
+        {
+          level: "info",
+          event: "stretch.link_created",
+          flavor: id,
+          originalLength: 44,
+          stretchedLength: longLink.length,
+        },
+      ]);
+      const written = lines.join("\n");
+      expect(written).not.toContain("secret-value");
+      // Whoever has the long link can see its destination, so no part of it is logged either.
+      const { pathname, search } = new URL(longLink);
+      const parts = [pathname, pathname.slice("/to/".length), search.slice(1)];
+      for (const part of parts.filter((text) => text !== "")) {
+        expect(written).not.toContain(part);
+      }
+    },
+  );
 
   it.for([
     ["an empty field", "", "There&#x27;s nothing here to stretch."],
@@ -168,6 +179,29 @@ describe("POST /", () => {
     ["an IP address", "http://192.0.2.7/login", "That URL uses an IP address instead of a name."],
     ["an IPv6 address", "http://[2001:db8::1]/", "That URL uses an IP address instead of a name."],
     ["a private-network name", "http://router.local/", "That URL points at a private network."],
+    ["a name under .lan", "http://printer.lan/", "That URL points at a private network."],
+    ["a name under .home.arpa", "http://nas.home.arpa/", "That URL points at a private network."],
+    ["a single-label name", "http://intranet/admin", "That URL points at a private network."],
+    [
+      "a hostname with an empty label",
+      "https://example.org../",
+      "That isn&#x27;t a valid hostname.",
+    ],
+    [
+      "this site's hostname with two trailing dots",
+      "http://example.com../to/x",
+      "That isn&#x27;t a valid hostname.",
+    ],
+    [
+      "a private name with two trailing dots",
+      "http://x.localhost../",
+      "That isn&#x27;t a valid hostname.",
+    ],
+    [
+      "a hostname too long for a storage key",
+      `https://${"a.".repeat(300)}com/`,
+      "That isn&#x27;t a valid hostname.",
+    ],
   ] as const)("rejects %s with status 400 and keeps the input", async ([, input, message]) => {
     const response = await submitStretchForm({ url: input, flavor: "legalese" });
 
@@ -246,6 +280,41 @@ describe("POST / with a destination that isn't allowed", () => {
     expect(lookups.count).toBe(0);
   });
 
+  it("rejects a blocked hostname spelled with two trailing dots, without a lookup", async () => {
+    await env.LINKS.put(blockedHostKey("banned.example.org"), "{}");
+    const lookups = countLookups();
+
+    const response = await submitStretchForm({
+      url: "https://banned.example.org../",
+      flavor: "ooo",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain("Elongation report");
+    expect(lookups.count).toBe(0);
+  });
+
+  it("rejects a name that the resolver refuses to judge, without a lookup", async () => {
+    // The real resolver answers a name with an empty label with status 400, which the reputation
+    // check counts as no objection.
+    const lookups = { count: 0 };
+    network.use(
+      http.get(RESOLVER_URL, () => {
+        lookups.count += 1;
+        return new HttpResponse(null, { status: 400 });
+      }),
+    );
+
+    const response = await submitStretchForm({
+      url: "https://malware.testcategory.com../",
+      flavor: "ooo",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain("Elongation report");
+    expect(lookups.count).toBe(0);
+  });
+
   it("stretches a link to a subdomain of a blocked hostname, because the match is exact", async () => {
     await env.LINKS.put(blockedHostKey("banned.example"), "{}");
 
@@ -299,6 +368,8 @@ describe("POST / and the creation rate limit", () => {
     await submitStretchForm({ url: "not a url", flavor: "ooo" });
     await submitStretchForm({ url: "http://192.0.2.7/", flavor: "ooo" });
     await submitStretchForm({ url: "https://example.org/", flavor: "brevity" });
+    await submitStretchForm({ url: `https://${"a.".repeat(300)}com/`, flavor: "ooo" });
+    await submitStretchForm({ url: "http://intranet/admin", flavor: "ooo" });
 
     expect(keys).toEqual([]);
   });
@@ -332,6 +403,50 @@ describe("POST / and the creation rate limit", () => {
 
     expect(statuses).toEqual(Array.from({ length: 8 }, () => 200));
   });
+});
+
+describe("a method other than POST to the form's action", () => {
+  it.for(["PUT", "PATCH", "DELETE"])(
+    "answers %s with status 405 and creates nothing",
+    async (method) => {
+      const keys = useFakeLimiter(true);
+      const lookups = countLookups();
+      const put = vi.spyOn(env.LINKS, "put");
+
+      const response = await exports.default.fetch("http://example.com/?index", {
+        method,
+        body: new URLSearchParams({ url: "https://example.org/", flavor: "ooo" }),
+      });
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get("Allow")).toBe("GET, HEAD, POST");
+      expect(response.headers.get("content-type")).toContain("text/html");
+      const page = await response.text();
+      expect(page).toContain("<h1>405</h1><p>This page doesn&#x27;t accept that method.</p>");
+      expect(page).not.toContain("Elongation report");
+      expect(keys).toEqual([]);
+      expect(lookups.count).toBe(0);
+      expect(put).not.toHaveBeenCalled();
+    },
+  );
+
+  it.for(["PUT", "PATCH", "DELETE"])(
+    "answers %s with status 405 on a data request",
+    async (method) => {
+      const keys = useFakeLimiter(true);
+      const put = vi.spyOn(env.LINKS, "put");
+
+      const response = await exports.default.fetch("http://example.com/_.data?index", {
+        method,
+        body: new URLSearchParams({ url: "https://example.org/", flavor: "ooo" }),
+      });
+
+      expect(response.status).toBe(405);
+      await response.text();
+      expect(keys).toEqual([]);
+      expect(put).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("GET an unknown path", () => {
