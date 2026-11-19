@@ -1,7 +1,7 @@
 // Root route of the web app. It owns the HTML document shell, the site header and footer, the
 // stylesheet, the identity gate that keeps private routes private, and the error page that every
 // route renders inside.
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import {
   type ErrorResponse,
   isRouteErrorResponse,
@@ -21,6 +21,7 @@ import { useHydrated } from "#web/hydrated.ts";
 import { Marble } from "#web/marble.tsx";
 import { requireIdentityMiddleware } from "#web/middleware.ts";
 import { setMotionPaused, useMotionPaused, usePrefersReducedMotion } from "#web/motion.ts";
+import { startShine } from "#web/shine.ts";
 
 import type { Route } from "./+types/root.ts";
 
@@ -82,6 +83,9 @@ export function Layout({ children }: { children: ReactNode }) {
   // The loader doesn't run when the identity gate rejects the request or no route matches, and
   // the footer then goes without the link. The copyright line needs no data, so it's always there.
   const abuseEmail = useRouteLoaderData<typeof loader>("root")?.abuseEmail;
+  // The shine finds the gold on whatever page is showing, so the shell starts it once for all of
+  // them, the error page included.
+  useEffect(() => startShine(), []);
   return (
     <html lang="en">
       <head>

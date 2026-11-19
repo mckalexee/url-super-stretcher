@@ -1028,3 +1028,168 @@ dd {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* The shine */
+
+/*
+ * The property that src/web/shine.ts moves on foil text. `--shine-x` places the band: the
+ * distance from the element's top left corner to the band's centerline, measured across the band.
+ * It's registered, so it has a type that the browser can move smoothly between two values. It
+ * doesn't inherit, so a move restyles one element. Its resting value puts the band out of sight.
+ * A browser that can't register a property gives it no value at all, so every `var()` that
+ * reads it repeats the resting value as its fallback. Without that, the foil rule's background
+ * would be invalid there, and the letters would be transparent.
+ */
+@property --shine-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: -9999px;
+}
+
+/*
+ * Light on the gold. One slanted band of light lies across the window, and each gold element
+ * shows the slice of it that's on that element. The band follows a mouse, and every so often it
+ * crosses the window by itself. src/web/shine.ts moves it, and this section paints it. Every
+ * rule here needs the motion switch, so a page without the script, a paused page, and a page for
+ * a visitor who asks for reduced motion are styled as if this section weren't here. While the
+ * band is off the window, each element's slice is parked far outside the element.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* The numbers that set the look. They're tuned by eye. shine.ts reads the lean and the band's
+     width from here, so its geometry always matches what's painted. It reads the lean in degrees
+     and the width in pixels, so keep those units. */
+  :root[data-motion="on"] {
+    /* The color of the light, as red, green, and blue: a warm white, because pure white reads as
+       a hole in the gold. */
+    --shine-light: 255 251 224;
+    /* How far the band leans from vertical. Its top leads. */
+    --shine-lean: 20deg;
+    /* Half the width of the band, measured across it. The bright core is a seventh of this
+       wide. The rest is falloff, and a thin second streak that trails the core. */
+    --shine-band: 48px;
+    /* The opacity of the band's core, from 0 to 1. */
+    --shine-band-strength: 0.92;
+  }
+
+  /*
+   * The band: a narrow bright core with a soft falloff on both sides, and a thin, fainter streak
+   * that trails it, so it reads as a glint on polished metal and not as fog. The stops are shares
+   * of half the band's width, from the trailing edge to the leading one. Each element that paints
+   * the band says which way the gradient runs, where the band's centerline lies along it, and how
+   * far half the band reaches. The gradient is declared on every such element, and not once on
+   * the root, because a custom property takes the values of the properties in it where it's
+   * declared.
+   */
+  :root[data-motion="on"]
+    :is(h1:not(.destination), h2, .site-name, .figure dd, .flavor:has(input:checked) .flavor-name),
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    --shine-band-image: linear-gradient(
+      var(--shine-toward),
+      transparent calc(var(--shine-at) - var(--shine-half)),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.08))
+        calc(var(--shine-at) - var(--shine-half) * 0.74),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.6))
+        calc(var(--shine-at) - var(--shine-half) * 0.66),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.6))
+        calc(var(--shine-at) - var(--shine-half) * 0.6),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.1))
+        calc(var(--shine-at) - var(--shine-half) * 0.5),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.45))
+        calc(var(--shine-at) - var(--shine-half) * 0.2),
+      rgb(var(--shine-light) / var(--shine-band-strength))
+        calc(var(--shine-at) - var(--shine-half) * 0.07),
+      rgb(var(--shine-light) / var(--shine-band-strength))
+        calc(var(--shine-at) + var(--shine-half) * 0.07),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.45))
+        calc(var(--shine-at) + var(--shine-half) * 0.2),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.1))
+        calc(var(--shine-at) + var(--shine-half) * 0.5),
+      transparent calc(var(--shine-at) + var(--shine-half))
+    );
+  }
+
+  /*
+   * Foil text. The band is one more layer over the foil, and both show through the letters only,
+   * because the foil rule's `background-clip` covers every layer. The link page's hostname has no
+   * foil, so the selector leaves it out. A move of the band changes `--shine-x`, which repaints
+   * the element.
+   */
+  :root[data-motion="on"]
+    :is(h1:not(.destination), h2, .site-name, .figure dd, .flavor:has(input:checked) .flavor-name) {
+    --shine-toward: calc(90deg + var(--shine-lean));
+    --shine-at: var(--shine-x, -9999px);
+    --shine-half: var(--shine-band);
+
+    background-image: var(--shine-band-image), var(--foil);
+  }
+
+  /*
+   * The polished button and the gold bar paint the band on a pseudo-element, a strip of light
+   * that shine.ts moves with `transform`, which repaints neither surface. The strip lies at the
+   * bottom of its surface's stacking context: over the gold and under the label or the
+   * engraving, which stays readable while the band is on it. Each copy of the bar is a stacking
+   * context already, because it has a mask. The button becomes one here. A disabled button gets
+   * no light.
+   */
+  :root[data-motion="on"] .button-solid:not([disabled]) {
+    position: relative;
+    isolation: isolate;
+    /* `clip` keeps the strip inside the button without making the button a scroll container,
+       and it leaves the glow and the focus ring outside the button alone. The bar already
+       clips. */
+    overflow: clip;
+  }
+
+  /*
+   * A stacking context paints after its neighbors that aren't positioned, so the button's glow
+   * would lie over whatever follows the button in its row and not under it. Positioning what
+   * follows puts that order back within the row. The selector has no specificity, so a rule that
+   * gives one of those boxes a position of its own wins. The rule doesn't reach outside the row.
+   * There, the faint outer edge of the glow now lies over two neighbors that it used to lie
+   * under: the line that follows the row on a link's page, and the big figure before the row on a
+   * result. The difference is at most 3 levels of 255 at rest, and at most 13 while the pointer
+   * is over the button.
+   */
+  :where(:root[data-motion="on"] .button-solid:not([disabled])) ~ * {
+    position: relative;
+  }
+
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /*
+   * The strip: upright, as tall as the surface and as wide as the band, and centered on the
+   * surface's left edge. shine.ts moves it along the surface, and it leans and stretches the
+   * strip as it goes, so the band on the surface has the lean and the width that it has on the
+   * page. On the button that's one lean all the way across. On the gold bar, which is seen in
+   * perspective, it changes along the bar.
+   */
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    --shine-toward: 90deg;
+    --shine-at: 50%;
+    --shine-half: 50%;
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--shine-band) * 2);
+    margin-left: calc(var(--shine-band) * -1);
+    background: var(--shine-band-image);
+    transform: translateX(-9999px);
+  }
+
+  /* The far part of the bar is out of focus, and it fades into the dark. A warm white band reads
+     as gray fog there, so the blurred copy of the bar gets a dimmer band in the gold's own
+     color. The sharp copy keeps the white streak. */
+  :root[data-motion="on"] .bar-soft {
+    --shine-light: 255 236 150;
+    --shine-band-strength: 0.8;
+  }
+}
