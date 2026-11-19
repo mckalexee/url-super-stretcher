@@ -162,11 +162,17 @@ h1 {
 }
 
 h1 {
-  top: 122px;
-  font-size: 104px;
+  top: 112px;
+  font-size: 100px;
   font-weight: 900;
   line-height: 1.02;
   letter-spacing: -0.015em;
+}
+
+/* The home image keeps the bar flat and low, so the heading never sits on gold. */
+.home .rig {
+  bottom: -262px;
+  transform: rotateZ(-4deg) rotateY(52deg);
 }
 
 /* The image for a stretched link has no heading, so the name is the heading and the bar sits
