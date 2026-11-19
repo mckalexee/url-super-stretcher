@@ -1,0 +1,175 @@
+/*
+ * Styles for the coil prototype, a standalone page that shows one transition: a submitted link
+ * becomes the long link, runs out of its field, and coils around the page edge before the page
+ * changes to the result. The page's look comes from src/web/app.css, which coil.html links, so
+ * this file holds only what the transition adds: the fonts, which the app's bundler normally
+ * resolves, the text on the coil, the hand-off to the result, and a review toolbar that isn't
+ * part of the site.
+ */
+
+@font-face {
+  font-family: "Besley Variable";
+  font-weight: 400 900;
+  src: url("../../node_modules/@fontsource-variable/besley/files/besley-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-weight: 100 800;
+  src: url("../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+:root {
+  /* coil.js sets both again when the `slow` parameter stretches every duration. */
+  --coil-fade: 200ms;
+  --coil-handoff: 350ms;
+}
+
+/* The coil crosses the site name, the footer, and the button beside the field, so all three
+   step back while it plays. The whole button fades, not its label alone, because the dark
+   outline of the coil's letters looks dirty on polished gold. */
+.site-header,
+.site-footer,
+.home .go .button {
+  transition: opacity var(--coil-fade) ease;
+}
+
+.coiling .site-header,
+.coiling .site-footer,
+.coiling .home .go .button {
+  opacity: 0.12;
+}
+
+/*
+ * The coil is drawn in one SVG that covers the window, over the page and its frame. It has its
+ * own compositor layer, so a new piece of text repaints a small part of this layer and nothing
+ * of the blurred, masked gold bar under it.
+ */
+.coil-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.coil-overlay text {
+  fill: var(--bright);
+}
+
+/* A dark outline under each letter, so the text reads over the button and the gold bar. Text
+   inside the field goes without it, because the outline would cut into the letters that the
+   visitor's link still shows there. */
+.coil-overlay .coil-halo {
+  paint-order: stroke;
+  stroke: var(--black);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* The newest letters, in the colors of `.long-link-edge`. They are a separate element so the
+   glow filter covers a few letters and not the window. */
+.coil-overlay .coil-edge {
+  fill: #fff;
+  filter: drop-shadow(0 0 5px #ffcf4d);
+}
+
+/*
+ * The well on the result. A break after any character puts the same letters on each line
+ * whether the link is one text node or three, so nothing moves while the rest of it is typed.
+ */
+.long-link {
+  line-break: anywhere;
+  word-break: break-all;
+  view-transition-name: link;
+}
+
+/* The part still to come takes its space from the first frame. */
+.well-untyped {
+  color: transparent;
+}
+
+/*
+ * The hand-off. One box morphs into the well: the field by default, or the whole coil when
+ * coil.js sets `data-handoff="coil"` on the root element.
+ */
+:root[data-handoff="field"] .home .field-input,
+:root[data-handoff="coil"] .coil-overlay {
+  view-transition-name: link;
+}
+
+::view-transition-group(root),
+::view-transition-group(link) {
+  animation-duration: var(--coil-handoff);
+}
+
+::view-transition-group(link) {
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Each picture keeps its own size and is cut off by the morphing box. A picture that stretched
+   with the box would smear its text. */
+::view-transition-old(link),
+::view-transition-new(link) {
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+
+/* The coil is the exception: it shrinks with the box, so it appears to be drawn into the well.
+   The well sits at the middle of the box, where the coil converges. */
+:root[data-handoff="coil"]::view-transition-old(link) {
+  object-fit: fill;
+}
+
+:root[data-handoff="coil"]::view-transition-new(link) {
+  object-position: center;
+}
+
+/*
+ * The review toolbar. It's in a plain system font on a light panel, so nobody takes it for part
+ * of the page. It sits inside the lanes that the coil runs in.
+ */
+.review-bar {
+  position: fixed;
+  top: 72px;
+  right: 72px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 5px;
+  border-radius: 6px;
+  background: #f1f1f1;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  color: #1a1a1a;
+  font:
+    12px/1.3 system-ui,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-bar[hidden] {
+  display: none;
+}
+
+.review-bar button {
+  padding: 3px 10px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.review-bar button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
