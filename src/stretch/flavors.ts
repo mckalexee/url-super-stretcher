@@ -37,9 +37,14 @@ export function isFlavorId(value: string): value is FlavorId {
 // that doesn't happen in practice.
 const ID_BYTES = 16;
 
-// The bytes after the ID choose the words. Each choice reads one byte, and no flavor makes more
-// choices than this.
-const CHOICE_BYTES = 240;
+// The bytes after the ID choose the words and the characters of the click IDs. Each choice reads
+// one byte, and no flavor makes more choices than this.
+const CHOICE_BYTES = 1_400;
+
+// No flavor writes more than this, and each comes within about 150 characters of it. With the
+// site's address and the `/to/` prefix in front, the whole link comes to about 2,000 characters,
+// which is as long as a link can be and still work everywhere.
+const MAX_LENGTH = 1_960;
 
 const defaultRandom: RandomSource = (bytes) => {
   // `getRandomValues` fails when it's called without `crypto` as its receiver, so the default
@@ -78,10 +83,9 @@ function toHex(bytes: Uint8Array): string {
 }
 
 // Jargon. A chain of clauses in the shape "<doing> <adjective> <things> to <verb> <adjective>
-// <outcomes>", joined by connectors that each lead into the next "<doing>". The two adjective
-// lists and the two noun lists don't overlap, so a clause never repeats a word.
-
-const JARGON_CLAUSES = 9;
+// <outcomes>", joined by connectors that each lead into the next "<doing>". The chain grows until
+// one more clause would pass the length limit. The two adjective lists and the two noun lists
+// don't overlap, so a clause never repeats a word.
 
 const JARGON_DOING = [
   "leveraging",
@@ -100,6 +104,14 @@ const JARGON_DOING = [
   "ideating-around",
   "benchmarking",
   "onboarding",
+  "strategizing-around",
+  "pressure-testing",
+  "blue-skying",
+  "greenlighting",
+  "sunsetting",
+  "deep-diving-into",
+  "upleveling",
+  "institutionalizing",
 ];
 
 const JARGON_ADJECTIVES = [
@@ -119,6 +131,14 @@ const JARGON_ADJECTIVES = [
   "frictionless",
   "holistic",
   "scalable",
+  "best-practice",
+  "turnkey",
+  "board-level",
+  "high-visibility",
+  "market-leading",
+  "fit-for-purpose",
+  "performance-based",
+  "agile",
 ];
 
 const JARGON_THINGS = [
@@ -138,6 +158,14 @@ const JARGON_THINGS = [
   "quick-wins",
   "moving-parts",
   "mindshare",
+  "key-performance-indicators",
+  "strategic-imperatives",
+  "market-opportunities",
+  "core-capabilities",
+  "operating-models",
+  "decision-frameworks",
+  "success-criteria",
+  "leadership-priorities",
 ];
 
 const JARGON_VERBS = [
@@ -157,6 +185,14 @@ const JARGON_VERBS = [
   "unlock",
   "champion",
   "synergize",
+  "optimize",
+  "maximize",
+  "drive",
+  "deliver-on",
+  "capitalize-on",
+  "elevate",
+  "galvanize",
+  "transform",
 ];
 
 const JARGON_OUTCOME_ADJECTIVES = [
@@ -176,6 +212,14 @@ const JARGON_OUTCOME_ADJECTIVES = [
   "granular",
   "actionable",
   "organic",
+  "measurable",
+  "sustainable",
+  "category-defining",
+  "premium",
+  "strategic",
+  "transformational",
+  "high-margin",
+  "market-ready",
 ];
 
 const JARGON_OUTCOMES = [
@@ -195,6 +239,14 @@ const JARGON_OUTCOMES = [
   "pain-points",
   "takeaways",
   "headwinds",
+  "growth",
+  "market-share",
+  "competitive-advantage",
+  "returns",
+  "momentum",
+  "positioning",
+  "leadership",
+  "results",
 ];
 
 const JARGON_CONNECTORS = [
@@ -228,8 +280,9 @@ const JARGON_CLOSERS = [
 ];
 
 function jargon(id: Uint8Array, choices: Choices): string {
-  const clauses: string[] = [];
-  for (let index = 0; index < JARGON_CLAUSES; index += 1) {
+  const ending = [choices.pick(JARGON_CLOSERS), "tracked-as-action-item", toHex(id)].join("-");
+  let text = "";
+  for (;;) {
     const clause = [
       choices.pick(JARGON_DOING),
       choices.pick(JARGON_ADJECTIVES),
@@ -239,18 +292,23 @@ function jargon(id: Uint8Array, choices: Choices): string {
       choices.pick(JARGON_OUTCOME_ADJECTIVES),
       choices.pick(JARGON_OUTCOMES),
     ];
-    if (index > 0) {
-      clause.unshift(choices.pick(JARGON_CONNECTORS));
+    if (text !== "") {
+      clause.unshift(text, choices.pick(JARGON_CONNECTORS));
     }
-    clauses.push(clause.join("-"));
+    const longer = clause.join("-");
+    if (longer.length + 1 + ending.length > MAX_LENGTH) {
+      break;
+    }
+    text = longer;
   }
-  return [...clauses, choices.pick(JARGON_CLOSERS), "tracked-as-action-item", toHex(id)].join("-");
+  return `${text}-${ending}`;
 }
 
 // Legalese. One notice with a fixed skeleton: two recitals that define "the recipient" and "the
-// link", the basis, two covenants, two provisos, and an attestation. It reads as a document from
-// a sender who expects to be obeyed. Each list fills one slot, and every entry in a list has the
-// same grammatical shape, so any combination reads as a sentence.
+// link", the basis, a run of covenants, a run of provisos, and an attestation. It reads as a
+// document from a sender who expects to be obeyed. Every entry in a list has the same
+// grammatical shape, so any combination reads as a sentence. The covenants and the provisos are
+// drawn without repeats, and the provisos run until one more would pass the length limit.
 
 const LEGAL_CLICKERS = [
   "the-party-of-the-first-part",
@@ -316,6 +374,14 @@ const LEGAL_COVENANTS = [
   "consents-to-the-exclusive-jurisdiction-of-the-courts-selected-by-the-sender",
   "represents-and-warrants-that-the-recipient-is-authorized-to-click",
   "accepts-these-terms-by-clicking-hovering-or-otherwise-interacting-herewith",
+  "submits-to-the-authority-of-the-sender-in-all-matters-relating-to-this-link",
+  "agrees-to-keep-the-existence-and-contents-of-this-link-strictly-confidential",
+  "acknowledges-that-the-sender-has-relied-upon-the-recipient-clicking-promptly",
+  "warrants-that-the-recipient-has-full-power-and-authority-to-open-this-link",
+  "undertakes-to-notify-the-sender-forthwith-upon-arrival-at-the-destination",
+  "agrees-to-bear-all-costs-and-expenses-incurred-in-connection-with-clicking",
+  "waives-presentment-demand-protest-and-notice-of-every-kind",
+  "appoints-the-sender-as-attorney-in-fact-for-all-purposes-hereunder",
 ];
 
 const LEGAL_FURTHER_COVENANTS = [
@@ -338,6 +404,14 @@ const LEGAL_PROVISOS = [
   "words-in-the-singular-shall-include-the-plural-and-vice-versa",
   "this-link-shall-be-governed-by-the-laws-of-the-jurisdiction-of-the-sender",
   "the-foregoing-recitals-are-incorporated-herein-by-this-reference",
+  "the-sender-shall-have-no-liability-howsoever-arising-in-connection-with-the-destination",
+  "the-remedies-of-the-sender-shall-survive-the-closing-of-the-browser",
+  "this-link-shall-inure-to-the-benefit-of-the-sender-and-its-successors",
+  "no-third-party-shall-acquire-any-right-under-or-by-virtue-of-this-link",
+  "the-recipient-may-not-assign-any-right-or-obligation-hereunder",
+  "any-dispute-hereunder-shall-be-resolved-at-the-sole-election-of-the-sender",
+  "the-terms-hereof-shall-be-construed-in-favor-of-the-sender-in-all-cases",
+  "delivery-of-this-link-by-electronic-means-shall-be-deemed-effective-upon-sending",
 ];
 
 const LEGAL_FURTHER_PROVISOS = [
@@ -362,8 +436,18 @@ const LEGAL_ATTESTATIONS = [
   "duly-authorized-and-issued-by-the-office-of-the-sender",
 ];
 
+// The covenants run until the notice reaches this length, which leaves the provisos about the
+// same room.
+const LEGAL_COVENANTS_END = 1_050;
+
+// Hands out the entries of a list in a random order, each one once, then `undefined`.
+function drawWithoutRepeats(list: readonly string[], choices: Choices): () => string | undefined {
+  const rest = [...list];
+  return () => (rest.length === 0 ? undefined : rest.splice(choices.below(rest.length), 1)[0]);
+}
+
 function legalese(id: Uint8Array, choices: Choices): string {
-  return [
+  const opening = [
     "whereas",
     choices.pick(LEGAL_CLICKERS),
     "hereinafter-the-recipient",
@@ -374,18 +458,36 @@ function legalese(id: Uint8Array, choices: Choices): string {
     choices.pick(LEGAL_LINK_RECITALS),
     "now-therefore",
     choices.pick(LEGAL_CONSIDERATIONS),
-    "the-recipient-hereby",
-    choices.pick(LEGAL_COVENANTS),
-    "and-further",
-    choices.pick(LEGAL_FURTHER_COVENANTS),
-    "provided-however-that",
-    choices.pick(LEGAL_PROVISOS),
-    "and-provided-further-that",
-    choices.pick(LEGAL_FURTHER_PROVISOS),
+  ].join("-");
+  const ending = [
     choices.pick(LEGAL_ATTESTATIONS),
     "and-recorded-as-instrument-number",
     toHex(id),
   ].join("-");
+  const covenant = drawWithoutRepeats([...LEGAL_COVENANTS, ...LEGAL_FURTHER_COVENANTS], choices);
+  const proviso = drawWithoutRepeats([...LEGAL_PROVISOS, ...LEGAL_FURTHER_PROVISOS], choices);
+
+  let text = `${opening}-the-recipient-hereby-${covenant() ?? ""}`;
+  while (text.length < LEGAL_COVENANTS_END) {
+    const next = covenant();
+    if (next === undefined) {
+      break;
+    }
+    text += `-and-further-${next}`;
+  }
+  text += `-provided-however-that-${proviso() ?? ""}`;
+  for (;;) {
+    const next = proviso();
+    if (next === undefined) {
+      break;
+    }
+    const longer = `${text}-and-provided-further-that-${next}`;
+    if (longer.length + 1 + ending.length > MAX_LENGTH) {
+      break;
+    }
+    text = longer;
+  }
+  return `${text}-${ending}`;
 }
 
 // Ooo. The word "long" with the ID hidden in its o's. The ID is written in base 3, and each digit
@@ -397,7 +499,7 @@ const OOO_DIGITS = ["o", "O", "0"];
 // 3^81 is the first power of 3 above 2^128, so 81 digits hold every ID.
 const OOO_DIGIT_COUNT = 81;
 
-const OOO_RUN_LENGTH = 9;
+const OOO_RUN_LENGTH = 23;
 
 function ooo(id: Uint8Array, choices: Choices): string {
   let rest = BigInt(`0x${toHex(id)}`);
@@ -413,9 +515,10 @@ function ooo(id: Uint8Array, choices: Choices): string {
   return `l${runs}ng`;
 }
 
-// Tracking. A landing page with every campaign parameter, then parameters that tell the
-// recipient how they rank, what is expected of them, and that the sender is watching. The click
-// IDs are random noise, as the real ones appear to be.
+// Tracking. A landing page with every campaign parameter and every ad platform's click ID, then
+// parameters that tell the recipient how they rank, what is expected of them, and that the sender
+// is watching. The click IDs are random noise, as the real ones appear to be, and three long
+// marketing tokens take up whatever length is left.
 
 const TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -562,6 +665,98 @@ const TRACKING_FOLLOW_UPS = [
   "arranged",
 ];
 
+const TRACKING_STANDINGS = [
+  "under-assessment",
+  "conditional",
+  "satisfactory",
+  "to-be-determined",
+  "flagged-for-review",
+  "acceptable",
+  "pending-verification",
+  "on-notice",
+];
+
+const TRACKING_SENIORITIES = [
+  "director-and-above",
+  "vice-president",
+  "c-suite",
+  "partner",
+  "board-member",
+  "managing-director",
+  "senior-management",
+  "principal",
+];
+
+const TRACKING_ATTENTIONS = [
+  "undivided",
+  "full",
+  "immediate",
+  "exclusive",
+  "sustained",
+  "priority",
+  "complete",
+  "uninterrupted",
+];
+
+const TRACKING_ESCALATIONS = [
+  "direct-to-principal",
+  "via-chief-of-staff",
+  "executive-assistant",
+  "office-of-the-chairman",
+  "senior-partner-review",
+  "board-secretary",
+  "managing-director",
+  "general-counsel",
+];
+
+const TRACKING_WINDOWS = [
+  "four-hours",
+  "end-of-day",
+  "one-business-day",
+  "until-noon",
+  "thirty-minutes",
+  "close-of-business",
+  "two-hours",
+  "immediate",
+];
+
+const TRACKING_FORWARDINGS = [
+  "prohibited",
+  "by-permission-only",
+  "monitored",
+  "restricted",
+  "logged",
+  "not-authorized",
+  "subject-to-approval",
+  "disabled",
+];
+
+const TRACKING_REPLY_TOS = [
+  "the-office-of-the-sender",
+  "executive-assistant",
+  "chief-of-staff",
+  "senior-counsel",
+  "the-principal-directly",
+  "private-secretary",
+  "designated-representative",
+  "the-managing-partner",
+];
+
+const TRACKING_REVIEWS = [
+  "scheduled",
+  "pending",
+  "quarterly",
+  "in-progress",
+  "under-consideration",
+  "to-be-arranged",
+  "annual",
+  "deferred",
+];
+
+// The length of the whole text. The last three tokens are cut to fit, so this flavor always
+// comes out at exactly this length.
+const TRACKING_LENGTH = 1_900;
+
 function tracking(id: Uint8Array, choices: Choices): string {
   const token = (length: number): string => {
     let text = "";
@@ -576,22 +771,47 @@ function tracking(id: Uint8Array, choices: Choices): string {
     ["utm_campaign", choices.pick(TRACKING_CAMPAIGNS)],
     ["utm_term", choices.pick(TRACKING_TERMS)],
     ["utm_content", choices.pick(TRACKING_CONTENTS)],
-    ["fbclid", token(64)],
-    ["gclid", token(64)],
-    ["msclkid", token(20)],
+    ["fbclid", token(96)],
+    ["gclid", token(88)],
+    ["wbraid", token(60)],
+    ["gbraid", token(60)],
+    ["dclid", token(64)],
+    ["msclkid", token(32)],
+    ["ttclid", token(64)],
+    ["twclid", token(40)],
+    ["li_fat_id", token(36)],
+    ["igshid", token(24)],
+    ["mc_eid", token(16)],
     ["click_id", toHex(id)],
     ["session_id", token(40)],
     ["impression_id", token(32)],
     ["sender_rank", choices.pick(TRACKING_RANKS)],
     ["recipient_tier", choices.pick(TRACKING_TIERS)],
+    ["account_standing", choices.pick(TRACKING_STANDINGS)],
+    ["seniority_required", choices.pick(TRACKING_SENIORITIES)],
     ["priority", choices.pick(TRACKING_PRIORITIES)],
     ["clearance", choices.pick(TRACKING_CLEARANCES)],
+    ["attention_level", choices.pick(TRACKING_ATTENTIONS)],
     ["response_expected", choices.pick(TRACKING_RESPONSES)],
+    ["open_window", choices.pick(TRACKING_WINDOWS)],
     ["read_receipt", choices.pick(TRACKING_RECEIPTS)],
+    ["forwarding", choices.pick(TRACKING_FORWARDINGS)],
+    ["reply_to", choices.pick(TRACKING_REPLY_TOS)],
+    ["escalation_path", choices.pick(TRACKING_ESCALATIONS)],
     ["engagement_score", choices.pick(TRACKING_ENGAGEMENTS)],
+    ["performance_review", choices.pick(TRACKING_REVIEWS)],
     ["follow_up", choices.pick(TRACKING_FOLLOW_UPS)],
   ];
-  return `landing?${parameters.map(([key, value]) => `${key}=${value}`).join("&")}`;
+  // Three long marketing tokens share the remaining length, so no single value dwarfs the rest.
+  const fillers = ["mkt_tok", "_gl", "_hsenc"];
+  const fixed = `landing?${parameters.map(([key, value]) => `${key}=${value}`).join("&")}`;
+  const keys = fillers.reduce((total, key) => total + key.length + 2, 0);
+  const room = TRACKING_LENGTH - fixed.length - keys;
+  const share = Math.floor(room / fillers.length);
+  return fillers.reduce((text, key, index) => {
+    const length = index === fillers.length - 1 ? room - share * index : share;
+    return `${text}&${key}=${token(length)}`;
+  }, fixed);
 }
 
 // Each writer takes the ID bytes, which it must put into its text in full, and the choices.
@@ -604,10 +824,10 @@ const WRITERS: Record<FlavorId, (id: Uint8Array, choices: Choices) => string> = 
 
 /**
  * Writes the part of a stretched link that follows the `/to/` prefix: a path, plus a query string
- * for the `tracking` flavor. The text is 600 to 1,500 characters long, and it uses only characters
- * that browsers and URL parsers leave alone, so the link that comes back in a request is the link
- * that went out. Each result carries a 128-bit random ID, and the same flavor and random bytes
- * always give the same text.
+ * for the `tracking` flavor. The text is about 1,800 to 1,960 characters long, and it uses only
+ * characters that browsers and URL parsers leave alone, so the link that comes back in a request
+ * is the link that went out. Each result carries a 128-bit random ID, and the same flavor and
+ * random bytes always give the same text.
  */
 export function generateStretch(flavor: FlavorId, random: RandomSource = defaultRandom): string {
   const bytes = new Uint8Array(ID_BYTES + CHOICE_BYTES);

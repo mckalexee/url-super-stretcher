@@ -96,5 +96,9 @@ stays, because it's a clause that he would want. `so-ordered-so-agreed-and-so-ve
 because it's the link nudging the reader.
 
 Every entry in a list has the same grammatical shape, so that any combination reads as a
-sentence, and each finish stays between 600 and 1,500 characters. The tests in
-`test/stretch/flavors.test.ts` check the length at both extremes.
+sentence.
+
+Each finish writes about 1,900 characters, so that a whole link comes to about 2,000. Executive
+adds clauses and Legal adds provisos until one more would pass the limit, so an entry longer than
+about 130 characters can leave a link short. The tests in `test/stretch/flavors.test.ts` check
+the length of every finish.

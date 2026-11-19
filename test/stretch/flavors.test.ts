@@ -7,9 +7,16 @@ import { FLAVORS, generateStretch, isFlavorId } from "#stretch/flavors.ts";
 import type { FlavorId, RandomSource } from "#stretch/flavors.ts";
 
 const FLAVOR_IDS = FLAVORS.map((flavor) => flavor.id);
-const MIN_LENGTH = 600;
-const MAX_LENGTH = 1500;
+const MIN_LENGTH = 1_780;
+const MAX_LENGTH = 1_960;
 const RANDOM_DRAWS = 300;
+// The length bounds get more draws than the other checks, because the jargon and legalese flavors
+// add clauses until the next one doesn't fit, and their length depends on every choice.
+const LENGTH_DRAWS = 2_000;
+
+// Two flavors always come out at one length: ooo has a fixed number of letters, and tracking
+// cuts its last tokens to fit.
+const EXACT_LENGTHS: Partial<Record<FlavorId, number>> = { ooo: 1_866, tracking: 1_900 };
 
 // The ID takes the first 16 bytes that the generator asks for.
 const ID_BYTES = 16;
@@ -72,7 +79,7 @@ describe("isFlavorId", () => {
 
 describe.each(FLAVOR_IDS)("generateStretch(%s)", (flavor) => {
   it("stays inside the length bounds over many random draws", () => {
-    for (let draw = 0; draw < RANDOM_DRAWS; draw += 1) {
+    for (let draw = 0; draw < LENGTH_DRAWS; draw += 1) {
       const { length } = generateStretch(flavor);
 
       expect(length).toBeGreaterThanOrEqual(MIN_LENGTH);
@@ -80,32 +87,25 @@ describe.each(FLAVOR_IDS)("generateStretch(%s)", (flavor) => {
     }
   });
 
-  it("stays inside the length bounds at its shortest and its longest", () => {
-    // Each random byte makes one choice, so the choices add to the length independently. Taking
-    // the shortest and the longest value of every byte in turn reaches the true extremes, which
-    // random draws almost never do.
-    const shortest = capture(flavor);
-    const longest = shortest.slice();
-    for (let index = 0; index < shortest.length; index += 1) {
-      let min = Infinity;
-      let max = -Infinity;
-      const trial = shortest.slice();
-      for (let value = 0; value < 256; value += 1) {
-        trial[index] = value;
-        const { length } = generateStretch(flavor, replay(trial));
-        if (length < min) {
-          min = length;
-          shortest[index] = value;
-        }
-        if (length > max) {
-          max = length;
-          longest[index] = value;
-        }
-      }
-    }
+  it("stays inside the length bounds when every random byte is the same", () => {
+    // A constant source makes every choice land on one entry of each list, so the same clause
+    // repeats to the end. That covers the lists' shortest and longest entries, which random
+    // draws rarely line up.
+    for (let value = 0; value < 256; value += 1) {
+      const { length } = generateStretch(flavor, fixed([value]));
 
-    expect(generateStretch(flavor, replay(shortest)).length).toBeGreaterThanOrEqual(MIN_LENGTH);
-    expect(generateStretch(flavor, replay(longest)).length).toBeLessThanOrEqual(MAX_LENGTH);
+      expect(length).toBeGreaterThanOrEqual(MIN_LENGTH);
+      expect(length).toBeLessThanOrEqual(MAX_LENGTH);
+    }
+  });
+
+  it.runIf(EXACT_LENGTHS[flavor] !== undefined)("always has the same length", () => {
+    for (let draw = 0; draw < RANDOM_DRAWS; draw += 1) {
+      expect(generateStretch(flavor).length).toBe(EXACT_LENGTHS[flavor]);
+    }
+    for (let value = 0; value < 256; value += 1) {
+      expect(generateStretch(flavor, fixed([value])).length).toBe(EXACT_LENGTHS[flavor]);
+    }
   });
 
   it("uses only characters that a URL keeps unchanged", () => {

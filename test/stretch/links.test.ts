@@ -52,7 +52,7 @@ describe("createLink", () => {
     expect(link.url).toBe(TARGET.href);
     expect(link.flavor).toBe(flavor);
     expect(link.path.startsWith(LINK_PREFIX)).toBe(true);
-    expect(link.path.length).toBeGreaterThanOrEqual(LINK_PREFIX.length + 600);
+    expect(link.path.length).toBeGreaterThanOrEqual(LINK_PREFIX.length + 1_780);
     expect(new Date(link.createdAt).toISOString()).toBe(link.createdAt);
     expect(Date.parse(link.createdAt)).toBeGreaterThanOrEqual(before);
   });

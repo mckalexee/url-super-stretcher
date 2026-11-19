@@ -104,7 +104,7 @@ describe("POST /", () => {
     const page = await response.text();
     const longLink = longLinkIn(page);
     expect(longLink.startsWith("http://example.com/to/")).toBe(true);
-    expect(longLink.length).toBeGreaterThan(600);
+    expect(longLink.length).toBeGreaterThan(1_780);
     expect(page).toContain("Specifications");
   });
 
