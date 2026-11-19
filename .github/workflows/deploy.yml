@@ -1,0 +1,142 @@
+# Deploys the Worker to production on every push to `main`, after CI passes. You can also run it
+# by hand from the Actions tab.
+#
+# Needs:
+# - Variable `DEPLOY_ENABLED` set to `true`. Until then the deploy job is skipped, so the
+#   template and a new project never deploy before their secrets exist.
+# - Secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, in the repository or in the
+#   `production` environment.
+# - Optional variable `HEALTHCHECK_URL`, the Worker's base URL without a trailing slash, such as
+#   `https://example.com`. When it's set, the job checks that `/healthz` answers 200 with
+#   `{"ok":true}` after the deploy.
+# @starter:oauth
+#   It also checks that an unauthenticated `POST /mcp` gets the OAuth sign-in challenge.
+# @starter:end
+#
+# The Worker's own secrets live on the Worker, not here. Upload them with `wrangler secret bulk`.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to production
+    needs: ci
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    # Two deploys never overlap, and a deploy in flight is never cancelled.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      # Fail before the install, so a missing secret costs seconds and names what to add.
+      - name: Check the Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=()
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing+=(CLOUDFLARE_API_TOKEN)
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing+=(CLOUDFLARE_ACCOUNT_ID)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing Cloudflare credentials::Add the secrets ${missing[*]} to the repository or to the production environment. docs/deploy.md lists the token permissions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The Vite plugin writes the deployable config and points Wrangler at it through
+      # `.wrangler/deploy/config.json`, so the build comes first.
+      - name: Build
+        run: pnpm build
+
+      # The version tag maps each Worker version to its commit, for `wrangler versions list` and
+      # rollbacks.
+      - name: Get the short commit SHA
+        id: commit
+        run: echo "short-sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      # With no `wranglerVersion`, the action runs the Wrangler from package.json, which is the
+      # version CI tested. The message is fixed text, because a commit message interpolated into
+      # the command could inject arguments.
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: pnpm
+          command: >-
+            deploy --tag ${{ steps.commit.outputs.short-sha }}
+            --message "Deploy from GitHub Actions run ${{ github.run_id }}"
+
+      - name: Check /healthz
+        if: vars.HEALTHCHECK_URL != ''
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          # A new version can take a few seconds to reach every location, so retry briefly. curl
+          # doesn't follow redirects here, so an Access login redirect fails the check.
+          url="${HEALTHCHECK_URL%/}/healthz"
+          body="$RUNNER_TEMP/healthz.json"
+          for attempt in $(seq 1 7); do
+            # A failed connection writes no body, so clear the previous attempt's answer.
+            rm -f "$body"
+            status=$(curl -sS --max-time 10 -o "$body" -w '%{http_code}' "$url") || status=000
+            if [ "$status" = 200 ] && [ "$(cat "$body")" = '{"ok":true}' ]; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 7 ]; then
+              sleep 5
+            fi
+          done
+          echo "::error title=Health check failed::$url didn't answer 200 with {\"ok\":true} after 7 attempts. The last status was $status."
+          exit 1
+
+      # @starter:oauth
+      # An unauthenticated MCP request must get the OAuth challenge that points clients at the
+      # protected resource metadata, or no client can sign in.
+      - name: Check the MCP sign-in challenge
+        if: vars.HEALTHCHECK_URL != ''
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          url="${HEALTHCHECK_URL%/}"
+          headers="$RUNNER_TEMP/mcp-headers.txt"
+          status=$(curl -sS --max-time 10 -o /dev/null -D "$headers" -w '%{http_code}' \
+            -X POST -H 'content-type: application/json' --data '{}' "$url/mcp")
+          if [ "$status" != 401 ]; then
+            echo "::error title=Unexpected MCP status::POST $url/mcp returned $status instead of 401."
+            exit 1
+          fi
+          if ! grep -qi '^www-authenticate:.*resource_metadata' "$headers"; then
+            echo "::error title=No resource metadata::The 401 from $url/mcp has no WWW-Authenticate header with resource_metadata."
+            exit 1
+          fi
+      # @starter:end
