@@ -1,10 +1,10 @@
 /*
  * Styles for the coil prototype, a standalone page that shows one transition: a submitted link
- * becomes the long link, runs out of its field, and coils around the page edge before the page
- * changes to the result. The page's look comes from src/web/app.css, which coil.html links, so
- * this file holds only what the transition adds: the fonts, which the app's bundler normally
- * resolves, the text on the coil, the hand-off to the result, and a review toolbar that isn't
- * part of the site.
+ * becomes the long link, runs out of its field, and coils around the page, and then the page
+ * changes to the result and the link flies into the result's well. The page's look comes from
+ * src/web/app.css, which coil.html links, so this file holds only what the transition adds:
+ * the fonts, which the app's bundler normally resolves, the text on the coil, the rows that fly
+ * from the coil into the result, and a review toolbar that isn't part of the site.
  */
 
 @font-face {
@@ -22,24 +22,110 @@
 }
 
 :root {
-  /* coil.js sets both again when the `slow` parameter stretches every duration. */
-  --coil-fade: 200ms;
-  --coil-handoff: 350ms;
+  /* coil.js sets the duration again for the `slow` parameter and for a still image. */
+  --coil-fade: 300ms;
+  /* How far everything that the coil runs over steps back, and how far the marble and the
+     gold bar do. The link is then the brightest thing on the page. */
+  --coil-dim: 0.08;
+  --coil-stage-dim: 0.4;
 }
 
-/* The coil crosses the site name, the footer, and the button beside the field, so all three
-   step back while it plays. The whole button fades, not its label alone, because the dark
-   outline of the coil's letters looks dirty on polished gold. */
+/*
+ * Making room. The coil's inner lanes cross the content, so when the head leaves the field,
+ * everything on the home page fades except the link itself, which is drawn in the overlay. The
+ * band fades whole, with the field's box and the button in it, because the dark outline of the
+ * coil's letters looks dirty on a gold border or on polished gold. Only `opacity` changes.
+ */
 .site-header,
 .site-footer,
-.home .go .button {
+.home .stage,
+.home .hero,
+.home .flavors,
+.home .go {
   transition: opacity var(--coil-fade) ease;
 }
 
-.coiling .site-header,
-.coiling .site-footer,
-.coiling .home .go .button {
-  opacity: 0.12;
+.coil-dim .site-header,
+.coil-dim .site-footer,
+.coil-dimmed .hero,
+.coil-dimmed .flavors,
+.coil-dimmed .go {
+  opacity: var(--coil-dim);
+}
+
+.coil-dimmed .stage {
+  opacity: var(--coil-stage-dim);
+}
+
+/* Everything that fades has its compositor layer from the start of a run, so the browser
+   doesn't make and paint six layers in the frame where the fade starts. coil.js takes the
+   class off when the run ends. */
+.coil-running .site-header,
+.coil-running .site-footer,
+.coil-running .home .stage,
+.coil-running .home .hero,
+.coil-running .home .flavors,
+.coil-running .home .go {
+  will-change: opacity;
+}
+
+/* While the home page fades out over the result, it keeps its place and takes no space, so
+   the result is laid out where it will stay. */
+.home.coil-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/*
+ * The finale is set up while the finished coil holds still, and the page is then already as
+ * tall as the result. Until the motion starts, the page's frame and the footer stay where the
+ * home page had them, at the window's edge, so nothing is seen to change.
+ */
+body.coil-held::before {
+  bottom: auto;
+  height: calc(100vh - 24px);
+}
+
+.coil-held .site-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/*
+ * The result during the finale. The stylesheet makes a page its own stacking context, so the
+ * rows that fly into the well are inside the result: over its background and the well, and
+ * under its heading, figures, buttons, and table. The result can't fade in as one layer with
+ * the rows in it, so its parts fade together, and its background is drawn by an element of its
+ * own under everything, with the values that coil.js copies from the result.
+ */
+main.coil-arriving {
+  background: none;
+}
+
+.coil-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  max-width: none;
+  pointer-events: none;
+}
+
+.coil-arriving .result > div {
+  position: relative;
+  z-index: 2;
+}
+
+/* The result's parts get their compositor layers while the finished coil holds still, and
+   the browser paints them then, so that work isn't in the frame where the fade starts.
+   coil.js takes the class off when the fade ends. */
+.coil-fading > .coil-backdrop,
+.coil-fading > form,
+.coil-fading .result > * {
+  will-change: opacity;
 }
 
 /*
@@ -63,9 +149,9 @@
   fill: var(--bright);
 }
 
-/* A dark outline under each letter, so the text reads over the button and the gold bar. Text
-   inside the field goes without it, because the outline would cut into the letters that the
-   visitor's link still shows there. */
+/* A dark outline under each letter, so the text reads over the gold bar and over another lane's
+   letters at a corner. Text inside the field goes without it, because the outline would cut
+   into the letters that the visitor's link still shows there. */
 .coil-overlay .coil-halo {
   paint-order: stroke;
   stroke: var(--black);
@@ -81,55 +167,56 @@
 }
 
 /*
- * The well on the result. A break after any character puts the same letters on each line
- * whether the link is one text node or three, so nothing moves while the rest of it is typed.
+ * The well on the result. A break after any character makes its rows a strict grid, so the row
+ * that a character lands in is known before the result is on the page.
  */
 .long-link {
   line-break: anywhere;
   word-break: break-all;
-  view-transition-name: link;
 }
 
-/* The part still to come takes its space from the first frame. */
-.well-untyped {
+/* The well holds the whole link from the first frame, unseen, so it never changes size. Its
+   own text shows when the last row has landed on it. */
+.long-link.coil-waiting {
   color: transparent;
 }
 
 /*
- * The hand-off. One box morphs into the well: the field by default, or the whole coil when
- * coil.js sets `data-handoff="coil"` on the root element.
+ * The rows in flight. Each is a line of text that sits exactly on its place in the well, in
+ * the well's font, which coil.js copies to this element, and a transform carries it there from
+ * the coil. The element covers the result and clips its lines, so a turning line never gives
+ * the page a scroll bar.
  */
-:root[data-handoff="field"] .home .field-input,
-:root[data-handoff="coil"] .coil-overlay {
-  view-transition-name: link;
+.coil-flyers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--bright);
 }
 
-::view-transition-group(root),
-::view-transition-group(link) {
-  animation-duration: var(--coil-handoff);
+/* A line in flight has the same dark outline as the text on the coil, so it reads over the
+   marble. The outline is the color of the well. Each line has its compositor layer from the
+   moment it's made, while the finished coil holds still, so the browser doesn't make and paint
+   every layer in the frame where the flights start. A line that has landed gives its layer
+   up and drops its outline, so the line is drawn exactly as the well's own text will be, and
+   it's drawn over the lines still in flight, so a passing line and its outline never cut into
+   text at rest. */
+.coil-flyer {
+  position: absolute;
+  white-space: pre;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 4px var(--well);
+  will-change: transform, opacity;
 }
 
-::view-transition-group(link) {
-  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-/* Each picture keeps its own size and is cut off by the morphing box. A picture that stretched
-   with the box would smear its text. */
-::view-transition-old(link),
-::view-transition-new(link) {
-  height: 100%;
-  object-fit: none;
-  object-position: left top;
-}
-
-/* The coil is the exception: it shrinks with the box, so it appears to be drawn into the well.
-   The well sits at the middle of the box, where the coil converges. */
-:root[data-handoff="coil"]::view-transition-old(link) {
-  object-fit: fill;
-}
-
-:root[data-handoff="coil"]::view-transition-new(link) {
-  object-position: center;
+.coil-flyer.coil-landed {
+  z-index: 1;
+  paint-order: normal;
+  -webkit-text-stroke: 0;
+  will-change: auto;
 }
 
 /*
