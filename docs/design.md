@@ -5,49 +5,74 @@ How the site looks, and how to keep it that way. The words have their own guide,
 
 ## The identity
 
-The site is charcoal and silver, with names in wide spaced capitals, the way a maker's name is
-engraved on the back of a watch case or stamped on a metal card. The man in [copy.md](copy.md)
-commissioned it, and he wanted it to look heavy and costly. The design never jokes. It has no
-rulers, no stretched shapes, and no illustrations of length, because a picture of the joke
-explains the joke.
+The site is black marble and gold. The man in [copy.md](copy.md) commissioned it, and he wanted
+it to look expensive: gold foil headings, a double gold rule around every page, and a polished
+gold bar engraved with a stretched link. The design presents the product as a luxury and never
+comments on itself.
 
 ## Type
 
-- **Archivo**, a variable font with a width axis, sets everything except literal values.
-- **Engraved text** is Archivo at its widest width, `--wide`, in capitals with open letter
-  spacing. It sets names, headings, labels, and controls. It never sets a sentence.
-- **Sentences** are Archivo at normal width, in sentence case.
-- **IBM Plex Mono** sets literal values only: the field for a URL, the long link, and a
-  destination. Its look-alike characters differ, which matters when a visitor checks a hostname.
-  A literal value is never in capitals, because a link is case-sensitive.
+- **Besley**, a heavy slab serif, sets everything except literal values. Headings are weight 900
+  with a tight line height. Labels are weight 700, and names and buttons are weight 800.
+- **JetBrains Mono** sets literal values only: the field for a URL, the long link, a
+  destination, and the engraving on the gold bar. Its look-alike characters differ, which
+  matters when a visitor checks a hostname.
+- The stylesheet never changes the case of a string. A link is case-sensitive, and the copy is
+  written in the case it's shown in.
 
-Both fonts come from Fontsource packages and ship with the app, so a page calls no third-party
-origin.
+Both fonts are variable fonts from Fontsource packages and ship with the app, so a page calls no
+third-party origin.
 
 ## Color
 
 `src/web/app.css` defines every color as a custom property on `:root`. The site has one look,
 which is dark, and it doesn't follow the visitor's color scheme.
 
-- **Charcoal and silver** are the page and the text. A lighter charcoal makes a panel.
-- **The accent** is one blue, and it marks only what belongs to the visitor: the chosen finish,
-  the field in use, and the finished link. A page with nothing of the visitor's on it has no
-  accent. Don't use the accent to decorate.
-- **Red** marks an error and has no other use.
+- **Black** is the page, and a deeper black is the well of a field.
+- **Cream** is body text.
+- **Gold** is labels, names, rules, and borders. A deep gold draws the fine line inside a
+  border.
+- **Foil** is a gradient that shows through the letters of a heading, the site name, the big
+  figure on a result, and the name of the chosen finish.
+- **Polished gold** is a gradient that fills the main button on a page.
+- **A warm red** marks an error and has no other use.
 
 ## Layout
 
-- One wide column, aligned left, 78rem at most.
-- Nothing has a radius, a shadow, or a gradient. Rules are 1px.
-- The finishes sit side by side between two rules, in four columns, then two, then one.
-- On a result, the figures are on the left and the whole link is on the right. On a narrow
-  screen, they stack.
+- A 2px gold rule sits inside the page edge with a 1px rule inside it. It frames the whole page,
+  not the window.
+- There is one breakpoint, at 900px.
+- The home page, when wide, is a stage that fills the window over a band. The heading is at the
+  left of the stage, the finishes are at the right, and the band holds the field and the button.
+  When narrow, the stage is a strip at the top and everything else stacks under it.
+- Every other page is one column on marble that fades to black.
+- On a result, the figures are on the left and the whole link is on the right. When narrow, they
+  stack.
+
+## The gold bar
+
+The stage on the home page is a picture of the product: a stretched link as a gold bar that lies
+on black marble, seen at an angle. It runs off the left edge and goes out of focus to the right.
+
+- It's built in CSS. The angle comes from `perspective` on the stage and a rotation on the bar's
+  wrapper. The focus comes from two copies of the bar, a sharp one masked to the near part and a
+  blurred one masked to the far part.
+- There is one bar for each finish, and `:has()` shows the bar of the checked radio button, with
+  no script. A browser without `:has()` shows the first bar.
+- The text on each bar is real output. The home route's loader runs each finish's generator on a
+  fixed sequence of bytes, so the bar never needs copy of its own.
+- The stage is hidden from assistive technology.
+
+The marble is `src/web/marble.svg`, which draws gold veins with turbulence filters.
 
 ## Motion
 
-The site has one animation. When a result arrives, the finished link lights from the length of
-the visitor's own link to its full length, and every figure counts with it. `useLighting` in
-`src/web/routes/home.tsx` runs it.
+The home page has no motion. A choice of finish swaps the gold bar at once, and nothing
+transitions on hover.
+
+The site has one animation, on a result. When a result arrives, the finished link lights from
+the length of the visitor's own link to its full length, and every figure counts with it.
+`useLighting` in `src/web/routes/home.tsx` runs it.
 
 - The whole link is laid out from the first frame, so nothing moves while it lights.
 - One clock drives the link and the figures, so they agree in every frame.
@@ -58,5 +83,5 @@ look at them. A screenshot of the last frame doesn't show motion.
 
 ## Check a change
 
-Look at the home page, a result, and a link page at 320px and at 1280px wide. No page scrolls
-sideways at any width.
+Look at the home page with each finish chosen, a result, and a link page at 320px and at 1280px
+wide. No page scrolls sideways at any width.
