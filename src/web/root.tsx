@@ -57,7 +57,7 @@ export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: styl
 /** Document shell shared by every route, including error boundaries. */
 export function Layout({ children }: { children: ReactNode }) {
   // The loader doesn't run when the identity gate rejects the request or no route matches, and
-  // the footer then goes without the link.
+  // the footer then goes without the link. The copyright line needs no data, so it's always there.
   const abuseEmail = useRouteLoaderData<typeof loader>("root")?.abuseEmail;
   return (
     <html lang="en">
@@ -77,13 +77,14 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
         </header>
         {children}
-        {abuseEmail ? (
-          <footer className="site-footer">
+        <footer className="site-footer">
+          {abuseEmail ? (
             <p>
               <a href={`mailto:${abuseEmail}`}>Report abuse</a>
             </p>
-          </footer>
-        ) : null}
+          ) : null}
+          <p className="site-credit">© 2026 Alex McKenzie</p>
+        </footer>
         <ScrollRestoration />
         <Scripts />
       </body>

@@ -88,6 +88,12 @@ describe("GET /", () => {
     expect(await response.text()).toContain('<a href="mailto:abuse@jade.email">Report abuse</a>');
   });
 
+  it("credits the owner in the footer", async () => {
+    const response = await exports.default.fetch("http://example.com/");
+
+    expect(await response.text()).toContain('<p class="site-credit">© 2026 Alex McKenzie</p>');
+  });
+
   it("doesn't count against the creation rate limit", async () => {
     const keys = useFakeLimiter(true);
 
@@ -502,5 +508,13 @@ describe("GET an unknown path", () => {
 
     expect(response.status).toBe(404);
     expect(await response.text()).toContain("This page doesn&#x27;t exist.");
+  });
+
+  it("keeps the footer's copyright line when the root loader doesn't run", async () => {
+    const response = await exports.default.fetch("http://example.com/no-such-page");
+
+    const page = await response.text();
+    expect(page).toContain('<p class="site-credit">© 2026 Alex McKenzie</p>');
+    expect(page).not.toContain("Report abuse");
   });
 });
