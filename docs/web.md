@@ -99,13 +99,6 @@ Whether the site is private is configuration, not code. The `WEB_ACCESS` var dec
 
 `private` with an empty Access var is a configuration error too.
 
-<!-- @starter:mcp -->
-
-`WEB_ACCESS` is separate from the Access vars, because Cloudflare Access sign-in for MCP needs them
-on a public site too.
-
-<!-- @starter:end -->
-
 Set the vars at the top level of `wrangler.jsonc` and again in `previews.vars`, with the same
 `WEB_ACCESS` in both, because Previews inherit nothing.
 [Cloudflare Access applications](#cloudflare-access-applications) covers the applications that put
@@ -275,82 +268,6 @@ It covers every path, `/healthz` included, so the deploy workflow's health check
 Worker, and it needs a deployed Worker first. [Access on Previews](#access-on-previews) describes
 its one use here.
 
-<!-- @starter:mcp -->
-
-### Both halves on one hostname
-
-With Cloudflare Access sign-in, one allow application covers both halves, as the
-[Access layouts](auth.md#access-layouts) describe. The layouts in this section and in
-[Both halves on two hostnames](#both-halves-on-two-hostnames) are for the other sign-in modes.
-
-In the other sign-in modes, MCP clients must reach their paths without an Access login.
-Worker-level Access would block every path that they use, so a private web app next to MCP needs a
-custom domain. On that hostname, use two self-hosted applications instead: the allow application,
-and a bypass application for the health check and the MCP paths. Access applies the most specific
-match first, so the bypass application wins on its paths and the allow application covers
-everything else. `bypass-app.json`:
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-```json
-{
-  "type": "self_hosted",
-  "name": "<name> MCP and OAuth",
-  "domain": "<host>/mcp",
-  "destinations": [
-    { "type": "public", "uri": "<host>/healthz" },
-    { "type": "public", "uri": "<host>/mcp" },
-    { "type": "public", "uri": "<host>/authorize" },
-    { "type": "public", "uri": "<host>/token" },
-    { "type": "public", "uri": "<host>/register" },
-    { "type": "public", "uri": "<host>/callback" },
-    { "type": "public", "uri": "<host>/.well-known/*" }
-  ],
-  "policies": [
-    {
-      "name": "MCP clients and OAuth",
-      "decision": "bypass",
-      "include": [{ "everyone": {} }]
-    }
-  ]
-}
-```
-
-The bypass application leaves those paths open to everyone. That's intended: `/healthz` reveals
-nothing, and the consent page, the token endpoint, and `/mcp` do their own checks.
-
-<!-- @starter:end -->
-
-<!-- @starter:mcp -->
-
-### Both halves on two hostnames
-
-Alternatively, serve the Worker on two custom domains, such as `app.example.com` for the web app
-and `mcp.example.com` for MCP clients:
-
-1. Add both to `routes` in `wrangler.jsonc` with `custom_domain: true`.
-2. Create one allow application on `app.example.com`, and none on `mcp.example.com`.
-3. Set the `HEALTHCHECK_URL` repository variable to `https://mcp.example.com`, which Access
-   doesn't cover.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-With GitHub OAuth, also set `MCP_RESOURCE` to `https://mcp.example.com/mcp` and register
-`https://mcp.example.com/callback` with GitHub.
-
-<!-- @starter:end -->
-
-<!-- @starter:mcp -->
-
-The web pages also answer on `mcp.example.com`. Requests there carry no Access JWT, so private
-pages answer 403 while public pages render.
-
-<!-- @starter:end -->
-
 ### Create the applications
 
 Create the bypass application first, so its paths are never blocked, then the allow application.
@@ -393,10 +310,3 @@ private pages on Previews, protect the Worker's Previews from **Workers & Pages*
 That application also answers the Preview workflow's `/healthz` check, with a redirect to the
 Access login or a 401 challenge. The check recognizes both and passes with a notice, so the
 Preview still gets its comment, but the check can't tell whether the Preview serves traffic.
-
-<!-- @starter:mcp -->
-
-That application also covers `/mcp` on Previews, so MCP clients can't reach a Preview's MCP
-endpoint.
-
-<!-- @starter:end -->

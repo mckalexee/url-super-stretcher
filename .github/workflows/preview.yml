@@ -7,14 +7,6 @@
 # - Variable `DEPLOY_ENABLED` set to `true`. Until then both jobs are skipped.
 # - Secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, in the repository or in the
 #   `preview` environment.
-# @starter:oauth
-# - Optional secrets `PREVIEW_GITHUB_CLIENT_ID`, `PREVIEW_GITHUB_CLIENT_SECRET`, and
-#   `PREVIEW_COOKIE_SECRET`. The job passes each one that's set to the Preview as the Worker
-#   secret of the same name without the `PREVIEW_` prefix. GitHub reserves the `GITHUB_` prefix
-#   for its own secrets, so the names can't match the Worker's. A secret you leave unset comes
-#   from the Preview base config (`wrangler preview base-config secret put`), or from the previous
-#   deployment of the same Preview.
-# @starter:end
 #
 # Pull requests from forks never get a Preview, because their runs can't read secrets.
 name: Preview
@@ -64,24 +56,6 @@ jobs:
       # `wrangler preview` reads the config that the build writes, so the build comes first.
       - name: Build
         run: pnpm build
-
-      # @starter:oauth
-      # Previews ignore `secrets.required`, so the secrets come from this file. The file lives in
-      # the runner's temporary directory and is never printed.
-      - name: Write the Preview secrets file
-        env:
-          GITHUB_CLIENT_ID: ${{ secrets.PREVIEW_GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.PREVIEW_GITHUB_CLIENT_SECRET }}
-          COOKIE_SECRET: ${{ secrets.PREVIEW_COOKIE_SECRET }}
-        run: |
-          umask 077
-          : > "$RUNNER_TEMP/preview.env"
-          for name in GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET COOKIE_SECRET; do
-            if [ -n "${!name}" ]; then
-              printf '%s=%s\n' "$name" "${!name}" >> "$RUNNER_TEMP/preview.env"
-            fi
-          done
-      # @starter:end
 
       - name: Deploy the Preview
         id: preview
@@ -140,26 +114,6 @@ jobs:
           done
           echo "::error title=Preview unhealthy::$URL/healthz didn't answer 200 with {\"ok\":true} in 12 attempts. The last status was $status."
           exit 1
-
-      # @starter:oauth
-      # An unauthenticated MCP request must get the OAuth challenge that points clients at the
-      # protected resource metadata, or no client can sign in.
-      - name: Check the MCP sign-in challenge
-        env:
-          URL: ${{ steps.preview.outputs.url }}
-        run: |
-          headers="$RUNNER_TEMP/mcp-headers.txt"
-          status=$(curl -sS --max-time 10 -o /dev/null -D "$headers" -w '%{http_code}' \
-            -X POST -H 'content-type: application/json' --data '{}' "$URL/mcp")
-          if [ "$status" != 401 ]; then
-            echo "::error title=Unexpected MCP status::POST $URL/mcp returned $status instead of 401."
-            exit 1
-          fi
-          if ! grep -qi '^www-authenticate:.*resource_metadata' "$headers"; then
-            echo "::error title=No resource metadata::The 401 from $URL/mcp has no WWW-Authenticate header with resource_metadata."
-            exit 1
-          fi
-      # @starter:end
 
       # One comment per pull request, edited in place on every push.
       - name: Comment the Preview URL

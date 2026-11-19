@@ -17,8 +17,5 @@ export default defineConfig({
     reactRouter(),
     // @starter:end
   ],
-  // @starter:oauth
-  // A fixed port keeps the local `MCP_RESOURCE` URL valid, because OAuth tokens are bound to it.
-  // @starter:end
   server: { port: 5173, strictPort: true },
 });

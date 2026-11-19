@@ -4,9 +4,6 @@
 // It also gates the web app's private routes. Whether the site is private is runtime
 // configuration, not code: `WEB_ACCESS` is `public` or `private`.
 // @starter:end
-// @starter:mcp
-// Cloudflare Access sign-in for MCP, in `src/auth/access.ts`, resolves its callers here.
-// @starter:end
 // @starter:web
 import { createMiddleware } from "hono/factory";
 // @starter:end

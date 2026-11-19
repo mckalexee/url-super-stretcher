@@ -48,13 +48,6 @@ If the Worker doesn't exist yet, `wrangler secret bulk` creates it. For one key,
 
 The Worker's secrets live on the Worker, and GitHub holds the Cloudflare credentials.
 
-<!-- @starter:mcp -->
-
-GitHub can also hold Preview secrets, which a secrets step in the Preview workflow passes to
-Previews.
-
-<!-- @starter:end -->
-
 ## Previews
 
 `.github/workflows/preview.yml` deploys a Worker Preview named `pr-<number>` for each pull request
@@ -71,13 +64,6 @@ passes, with a notice, when Cloudflare Access answers instead of the Worker, bec
 can't sign in to Access. That Preview still gets its comment, but the check can't tell whether
 the Preview serves traffic.
 
-<!-- @starter:oauth -->
-
-With GitHub OAuth, the workflow also checks that `POST /mcp` answers `401` with
-`resource_metadata`, so MCP clients can find the sign-in flow.
-
-<!-- @starter:end -->
-
 Previews inherit nothing from production:
 
 - **Vars and bindings:** the `previews` block in `wrangler.jsonc` declares them again. A binding
@@ -88,50 +74,8 @@ Previews inherit nothing from production:
   `wrangler preview base-config secret bulk <file>`. A later change to it reaches only new
   Previews.
 
-<!-- @starter:mcp -->
-
-- **Secrets from GitHub:** the Preview workflow can also pass a secrets file with
-  `--secrets-file`, holding each Preview secret set in GitHub.
-- **KV:** `previews.kv_namespaces` binds a separate `OAUTH_KV` namespace, so Preview data never
-  mixes with production. All Previews share that one namespace.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-- **`MCP_RESOURCE`:** empty in `previews.vars`, so each Preview derives its resource URL from its
-  own `workers.dev` hostname. [auth.md](auth.md#preview-callbacks) covers GitHub callbacks on
-  Previews.
-
-<!-- @starter:end -->
-
 Cloudflare deletes the least recently deployed Preview when a Worker reaches its Preview limit,
 and the oldest deployment when a Preview reaches its deployment limit.
-
-<!-- @starter:mcp -->
-
-### Bearer mode on Previews
-
-In bearer mode, the Preview workflow has no step that writes the secrets file. To pass a Preview
-token from GitHub, add a repository secret named `PREVIEW_MCP_BEARER_TOKEN` and add this step
-before **Deploy the Preview**:
-
-```yaml
-- name: Write the Preview secrets file
-  env:
-    MCP_BEARER_TOKEN: ${{ secrets.PREVIEW_MCP_BEARER_TOKEN }}
-  run: |
-    umask 077
-    : > "$RUNNER_TEMP/preview.env"
-    if [ -n "$MCP_BEARER_TOKEN" ]; then
-      printf 'MCP_BEARER_TOKEN=%s\n' "$MCP_BEARER_TOKEN" >> "$RUNNER_TEMP/preview.env"
-    fi
-```
-
-The deploy step already passes the file when it isn't empty. Without the step, set the token once
-in the base config with `wrangler preview base-config secret put MCP_BEARER_TOKEN`.
-
-<!-- @starter:end -->
 
 ## GitHub Actions
 
@@ -154,36 +98,8 @@ The workflows read these secrets and variables:
 | `CLOUDFLARE_ACCOUNT_ID` | Secret   | `deploy.yml`, `preview.yml` | The account to deploy to.                                                                           |
 | `HEALTHCHECK_URL`       | Variable | `deploy.yml`                | Optional. The Worker's base URL without a trailing slash. The job checks `/healthz` after a deploy. |
 
-<!-- @starter:oauth -->
-
-With GitHub OAuth, `preview.yml` also reads these optional secrets, and passes each one that's set
-to Previews under the name in the second column. GitHub reserves the `GITHUB_` prefix for its own
-secrets, which is why the Preview secrets carry a `PREVIEW_` prefix.
-
-| Secret                         | Passed to Previews as  |
-| ------------------------------ | ---------------------- |
-| `PREVIEW_GITHUB_CLIENT_ID`     | `GITHUB_CLIENT_ID`     |
-| `PREVIEW_GITHUB_CLIENT_SECRET` | `GITHUB_CLIENT_SECRET` |
-| `PREVIEW_COOKIE_SECRET`        | `COOKIE_SECRET`        |
-
-<!-- @starter:end -->
-
-<!-- @starter:mcp -->
-
-In bearer mode, the step that you add in [Bearer mode on Previews](#bearer-mode-on-previews)
-reads the optional secret `PREVIEW_MCP_BEARER_TOKEN` and passes it as `MCP_BEARER_TOKEN`.
-
-<!-- @starter:end -->
-
 Set the secrets in the repository, or in the `production` and `preview` environments that the
 deploy and Preview jobs use.
-
-<!-- @starter:mcp -->
-
-A Preview secret that isn't set in GitHub comes from the base config or from the previous
-deployment of the same Preview.
-
-<!-- @starter:end -->
 
 ## Roll back
 
@@ -258,25 +174,6 @@ To serve the Worker on a hostname in one of your zones:
 
 2. Give the API token **Zone** > **Workers Routes** > **Edit** on the zone.
 3. Set the `HEALTHCHECK_URL` variable to `https://tools.example.com`.
-
-<!-- @starter:oauth -->
-
-With GitHub OAuth, also set `MCP_RESOURCE` in the top-level `vars` to
-`https://tools.example.com/mcp`, and add `https://tools.example.com/callback` to the GitHub OAuth
-app's callback URLs. With `workers_dev` off, the GitHub callback always arrives on the hostname
-that you registered.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-`createMcpApiHandler()` in `src/mcp/handler.ts` checks the `Host` header only on `localhost` and
-`workers.dev` by default. To apply the check on the custom domain, pass `allowedHostnames` where
-the production handler is created: in `src/mcp/handler.ts` with GitHub OAuth, or in
-`src/auth/bearer.ts` in bearer mode. Run `pnpm test` afterward, because the tests send requests
-to `localhost`.
-
-<!-- @starter:end -->
 
 ## Renovate
 

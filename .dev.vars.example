@@ -1,14 +1,1 @@
 # Copy this file to `.dev.vars` for local development.
-# @starter:mcp
-# Wrangler ignores a key here unless `secrets.required` in `wrangler.jsonc` lists it or a var has
-# its name. A key with a var's name overrides that var locally.
-# @starter:end
-
-# @starter:oauth
-# Client ID of the GitHub OAuth app used for MCP sign-in.
-GITHUB_CLIENT_ID=
-# Client secret of the same GitHub OAuth app.
-GITHUB_CLIENT_SECRET=
-# Random key that signs remembered consent. Generate one with `openssl rand -hex 32`.
-COOKIE_SECRET=
-# @starter:end

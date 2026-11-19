@@ -1,0 +1,14 @@
+{
+  "answers": {
+    "brief": "Stretches any URL into an absurdly long link that still redirects to the original, a satire of link shorteners. First, build a home page where a visitor pastes a URL and picks a flavor (corporate jargon, legalese, a long run of o's, or a tracking-parameter pile), and a redirect route that resolves the long link from KV storage.",
+    "display-name": "URL Super Stretcher",
+    "description": "Stretch any URL into an absurdly long link that still redirects to the original.",
+    "parts": "web",
+    "web-access": "public",
+    "hostname": "urlsuperstretcher.com",
+    "license": "mit"
+  },
+  "resources": {
+    "worker": "30592ebc3f8e45e1ba56f82010a69bec"
+  }
+}

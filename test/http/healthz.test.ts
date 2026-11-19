@@ -14,9 +14,7 @@ describe("GET /healthz", () => {
   it("sends Cross-Origin-Opener-Policy unless a popup needs window.opener", async () => {
     const response = await exports.default.fetch("http://example.com/healthz");
 
-    // @starter:oauth
-    // The consent page can run in a popup that reports back through `window.opener`.
-    expect(response.headers.get("Cross-Origin-Opener-Policy")).toBeNull();
-    // @starter:end
+    // No popup needs `window.opener`, so Hono's default applies.
+    expect(response.headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
   });
 });

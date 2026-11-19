@@ -24,15 +24,6 @@ const { vars, secrets }: { vars: Record<string, Json>; secrets?: { required?: st
 const TEST_SECRETS: Record<string, string> = Object.fromEntries(
   (secrets?.required ?? []).map((key) => [key, ""]),
 );
-// @starter:oauth
-Object.assign(TEST_SECRETS, {
-  GITHUB_CLIENT_ID: "test-client-id",
-  GITHUB_CLIENT_SECRET: "test-client-secret",
-  // Remembered consent needs a secret of at least 32 characters. This is 64 hex digits, the same
-  // shape that `openssl rand -hex 32` gives for `.dev.vars`.
-  COOKIE_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-});
-// @starter:end
 
 // Wrangler warns about each required secret that it can't find in `.dev.vars`, `.env`, or the
 // process environment, once per test file. The bindings below already supply the values, so
@@ -53,10 +44,6 @@ export default defineConfig({
         bindings: {
           ...vars,
           ...TEST_SECRETS,
-          // @starter:oauth
-          // The resource URL matches the origin that tests send requests to.
-          MCP_RESOURCE: "http://localhost:5173/mcp",
-          // @starter:end
         },
       },
     }),

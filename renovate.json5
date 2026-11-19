@@ -47,15 +47,6 @@
       groupName: "oxc",
       matchPackageNames: ["oxlint", "oxfmt", "oxlint-tsgolint"],
     },
-    // @starter:mcp
-    {
-      // `agents` requires an exact version of the MCP SDK, so the two move together and a person
-      // reviews every update.
-      groupName: "mcp",
-      matchPackageNames: ["agents", "@modelcontextprotocol/**"],
-      automerge: false,
-    },
-    // @starter:end
     // @starter:web
     {
       groupName: "react-router",

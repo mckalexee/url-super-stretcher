@@ -1,8 +1,5 @@
 // Typed errors that carry what an edge needs to respond. Code that detects a problem throws one of
 // these, and the Hono error handler turns it into a response.
-// @starter:mcp
-// The MCP tool wrapper turns the same errors into tool errors, with the message as the text.
-// @starter:end
 
 /**
  * An error with an HTTP status and a message that is safe to show to the client. The Hono error

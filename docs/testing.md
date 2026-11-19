@@ -32,13 +32,6 @@ fails and the normal run passes, a test depends on the order the files run in.
   your local values out of the tests. Give a new secret a value in `TEST_SECRETS` unless the tests
   expect it to be unset.
 
-<!-- @starter:oauth -->
-
-- `miniflare.bindings` also sets `MCP_RESOURCE` to `http://localhost:5173/mcp`, the origin that
-  tests send requests to.
-
-<!-- @starter:end -->
-
 <!-- @starter:web -->
 
 - `reactRouter()` in `plugins` resolves `virtual:react-router/server-build`, so requests reach the
@@ -66,14 +59,6 @@ import { exports } from "cloudflare:workers";
 
 const response = await exports.default.fetch("http://example.com/healthz");
 ```
-
-<!-- @starter:oauth -->
-
-`workerFetch(path, init)` from `test/helpers/oauth.ts` does the same with paths relative to
-`http://localhost:5173`, and returns redirects without following them, so a test can read
-`Location`.
-
-<!-- @starter:end -->
 
 <!-- @starter:access -->
 
@@ -103,26 +88,9 @@ a one-off change, save the value and restore it in `finally`.
 
 <!-- @starter:end -->
 
-<!-- @starter:oauth -->
-
-`useAuthVars(initial)` from `test/helpers/oauth.ts` sets `ALLOWED_GITHUB_LOGINS` to `initial`
-before each test, `*` by default, returns a setter, and restores the value after each test.
-
-<!-- @starter:end -->
-
 To pass different bindings to one call only, spread `env` into a new object, such as
 `{ ...env, APP_NAME: "Test" }`, and pass it to code that takes `env` as an argument. The Hono
 app's `fetch(request, env, ctx)` takes it, and its routes read the object as `c.env`.
-
-<!-- @starter:mcp -->
-
-The bearer token check in `src/auth/bearer.ts` also reads the `env` that you pass. MCP tools
-don't. The MCP handler gives each tool the module-level `env` from `cloudflare:workers`, whatever
-`env` you pass to the handler, so such a test still runs the tool with the default values. To
-change a binding that a tool reads, assign to `env` from `cloudflare:workers` and restore it after
-the test, as the start of this section describes.
-
-<!-- @starter:end -->
 
 ## Mock outbound requests
 
@@ -148,64 +116,6 @@ it("reads the upstream value", async () => {
   // ...
 });
 ```
-
-<!-- @starter:mcp -->
-
-## Test MCP tools
-
-`createMcpClient(fetcher, options)` from `test/helpers/mcp.ts` is a small JSON-RPC client for the
-Streamable HTTP transport. It works with any function that takes a `Request` and returns a
-`Response`, reads both JSON and Server-Sent Events bodies, and checks each result's shape:
-
-- `initialize()`, `listTools()`, and `callTool(name, args)` return the checked `result`.
-- A JSON-RPC error throws `JsonRpcError`, and a non-2xx status throws an `Error` with the body.
-- `post(method, params)` returns the raw response, for tests of status codes and headers.
-- `resultText(result)` returns the text of a tool result's first content block.
-
-[mcp.md](mcp.md#test-a-tool) explains which client to use for a tool test and has a worked
-example.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-`createOAuthMcpClient(accessToken)` points the client at `/mcp` through the Worker entry with an
-OAuth access token.
-
-## Test the OAuth flow
-
-`test/helpers/oauth.ts` drives the real flow through the Worker entry, the way an MCP client and a
-browser would, with GitHub replaced by MSW:
-
-| Helper                                                   | What it does                                                                                                           |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `registerClient(name)`                                   | Registers a public client with `POST /register` and returns its client ID.                                             |
-| `openConsent(name)`                                      | Registers a client and opens `GET /authorize` with PKCE.                                                               |
-| `consentHandle(page)`                                    | Reads the consent handle from the page.                                                                                |
-| `submitConsent(authorization, handle, decision, scopes)` | Posts the consent form with the browser's cookies.                                                                     |
-| `approveConsent(name)`                                   | Opens the consent page, approves it, and returns the GitHub redirect.                                                  |
-| `githubHandlers(user, calls)`                            | MSW handlers for GitHub's token endpoint and `GET /user`. The token endpoint accepts only the code `test-github-code`. |
-| `githubCallback(authorization, params)`                  | Calls `GET /callback` the way GitHub's redirect would.                                                                 |
-| `exchangeCode(authorization, code)`                      | Exchanges the code at `POST /token`.                                                                                   |
-| `refreshToken(authorization, token)`                     | Sends a refresh token and returns the raw response.                                                                    |
-| `mintAccessToken()`                                      | Runs the whole flow and returns an access token for `/mcp`.                                                            |
-| `CookieJar`                                              | Keeps the cookies a browser would between requests.                                                                    |
-
-`mintAccessToken()` needs `useNetwork()` with `githubHandlers()` in place, and an
-`ALLOWED_GITHUB_LOGINS` that admits the user, which `useAuthVars()` sets up:
-
-```ts
-const network = useNetwork();
-useAuthVars();
-
-it("calls a tool as the GitHub user", async () => {
-  network.use(...githubHandlers());
-  const client = createOAuthMcpClient(await mintAccessToken());
-  // ...
-});
-```
-
-<!-- @starter:end -->
 
 <!-- @starter:access -->
 

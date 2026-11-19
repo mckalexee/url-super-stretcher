@@ -1,5 +1,5 @@
 {
-  "name": "cloudflare-starter",
+  "name": "url-super-stretcher",
   "private": true,
   "type": "module",
   "imports": {
@@ -25,9 +25,6 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "1.2.4",
-    "@modelcontextprotocol/server": "2.4.0",
-    "agents": "0.33.0",
     "hono": "4.13.16",
     "isbot": "5.2.2",
     "jose": "6.2.15",

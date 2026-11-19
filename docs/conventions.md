@@ -23,23 +23,9 @@ listing or a description of a function signature. Duplicated facts drift apart o
 - Each directory under `src/` owns one area. `http` holds the Hono routes and middleware, and
   `lib` holds shared helpers with no knowledge of any area.
 
-<!-- @starter:mcp -->
-
-- `mcp` holds the MCP server and its tools, and `auth` holds the authentication for the MCP
-  endpoint.
-
-<!-- @starter:end -->
-
 <!-- @starter:web -->
 
 - `web` holds the React Router app.
-
-<!-- @starter:end -->
-
-<!-- @starter:mcp -->
-
-- `src/mcp` and `src/auth` never import `src/web`, `react`, or `react-router`. Oxlint enforces
-  this so that a project can delete the web app without breaking the MCP endpoint.
 
 <!-- @starter:end -->
 
@@ -86,12 +72,6 @@ Comments explain intent. The code already says what it does.
   call stack.
 - Map errors to responses at the edges, such as the Hono `onError` handler for HTTP.
 
-<!-- @starter:mcp -->
-
-- The tool wrapper in `src/mcp/define-tool.ts` is the edge for MCP tool results.
-
-<!-- @starter:end -->
-
 - Let unexpected errors propagate. The edge logs them and returns a generic 500 response, so the
   client never sees a stack trace or an upstream error body.
 
@@ -103,12 +83,6 @@ Comments explain intent. The code already says what it does.
   detail in fields, not in the event name.
 - Never log tokens, secrets, cookies, or other credentials. Log a user ID or a login when you
   need to identify who made a request.
-
-<!-- @starter:mcp -->
-
-- Never log `AuthProps`, because they can hold the user's upstream access token.
-
-<!-- @starter:end -->
 
 - Log a full URL only when it can't carry a credential. Log the path otherwise.
 
@@ -123,13 +97,6 @@ of the following are true:
 - The package is maintained and its size is reasonable for a Worker bundle.
 
 Pin the exact version (`pnpm add -E`). Renovate proposes updates.
-
-<!-- @starter:mcp -->
-
-`agents` and `@modelcontextprotocol/server` move together, because `agents` requires an exact
-version of the MCP SDK.
-
-<!-- @starter:end -->
 
 ## Writing style
 

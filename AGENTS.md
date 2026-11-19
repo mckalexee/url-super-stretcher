@@ -1,21 +1,17 @@
-# cloudflare-starter
+# url-super-stretcher
+
+<!-- setup:begin -->
+
+> [!IMPORTANT]
+> Setup isn't finished. Run `node scripts/setup.ts` before any other work, and follow what it
+> prints.
+
+<!-- setup:end -->
 
 One Cloudflare Worker with Hono in front. The README says what the project is and how to run it.
 This file holds what you need to change it well.
 
 Halves present: MCP endpoint (OAuth), web app.
-
-<!-- @starter:mcp -->
-
-The MCP endpoint is `/mcp`.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-The OAuth provider in `src/auth` guards it, and users sign in with GitHub.
-
-<!-- @starter:end -->
 
 <!-- @starter:web -->
 
@@ -49,36 +45,7 @@ pnpm tail                            # stream the deployed Worker's live logs
 module outside the current directory through its `#` subpath with the file extension, such as
 `#lib/log.ts`. [docs/conventions.md](docs/conventions.md#file-layout-and-naming) has the rules.
 
-<!-- @starter:mcp -->
-
-`src/mcp` and `src/auth` never import `src/web`, `react`, or `react-router`. Oxlint enforces it,
-so a project can delete the web app without breaking the MCP endpoint.
-
-<!-- @starter:end -->
-
 ## Checklists
-
-<!-- @starter:mcp -->
-
-### Add an MCP tool
-
-1. Create a module in `src/mcp/tools/` that exports a `defineTool()` registration.
-2. Name it `<area>_<verb>_<noun>`. Write the description in four parts: when to call it, what
-   the inputs mean, what it changes, and what it returns. Set `effect` and `openWorld`
-   honestly, and set `scope` when it reads or changes the user's data. A new scope goes in
-   `SCOPES` and `SCOPE_DESCRIPTIONS` in `src/env.ts`.
-3. Add it to the array in `src/mcp/tools/index.ts`. The server instructions list it on their own.
-4. Add tests in `test/mcp/`.
-
-[docs/mcp.md](docs/mcp.md) has a worked example of a tool and its test.
-
-### Replace the example tools
-
-Change these together: the tools in `src/mcp/tools/`, their tests in `test/mcp/`, `SCOPES` and
-`SCOPE_DESCRIPTIONS` in `src/env.ts`, `INSTRUCTIONS` in `src/mcp/instructions.ts`, and what
-`README.md` and `docs/mcp.md` say about the example tools.
-
-<!-- @starter:end -->
 
 <!-- @starter:web -->
 
@@ -108,28 +75,6 @@ Change these together: the tools in `src/mcp/tools/`, their tests in `test/mcp/`
 - pnpm refuses a dependency version that's younger than one day. To use one, commit its
   `minimumReleaseAgeExclude` entry in `pnpm-workspace.yaml`, or pick an older version.
 
-<!-- @starter:mcp -->
-
-- `pnpm dev` loads a `.dev.vars` key only if `secrets.required` lists it or it overrides a var.
-  Tests bind fixed values over every var and required secret, so `.dev.vars` doesn't affect them.
-- `McpAgent` is deprecated and banned by oxlint. Serve MCP through `src/mcp/handler.ts`.
-- Per-user KV keys start with `user:<id>:`, so they stay apart from every other record in the
-  namespace.
-
-<!-- @starter:end -->
-
-<!-- @starter:oauth -->
-
-- Auth handlers read the provider's helpers from `c.env.OAUTH_PROVIDER`, never from the `env` in
-  `cloudflare:workers`, because the provider adds them only to the `env` of each request.
-- The consent page lives in `src/auth/consent.ts` and renders with `hono/html`, which escapes
-  every value. Keep it in `src/auth`.
-- `MCP_RESOURCE` must equal the URL that clients use for `/mcp`, because every token is bound to
-  it. Local requests and `workers.dev` Previews derive it from the request instead.
-- An empty `ALLOWED_GITHUB_LOGINS` denies everyone. `*` admits every GitHub account.
-
-<!-- @starter:end -->
-
 <!-- @starter:access -->
 
 - Identity goes through `src/http/access.ts`. `ctx.access` is absent behind the static assets
@@ -156,13 +101,6 @@ Topic guides:
 
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.
-
-<!-- @starter:mcp -->
-
-- [docs/mcp.md](docs/mcp.md): tool design and a worked example.
-- [docs/auth.md](docs/auth.md): how MCP clients authenticate.
-
-<!-- @starter:end -->
 
 <!-- @starter:web -->
 
