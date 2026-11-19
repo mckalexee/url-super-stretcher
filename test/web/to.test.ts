@@ -96,12 +96,13 @@ describe("GET /to/* for a stored link", () => {
   });
 
   it("reports the length of the link that the visitor followed", async () => {
-    const link = await createLink(env.LINKS, new URL(TARGET), "legalese");
-    const length = new Intl.NumberFormat("en-US").format((ORIGIN + link.path).length);
+    const link = await createLink(env.LINKS, new URL(TARGET), "ooo");
 
     const page = await (await view(link.path)).text();
 
-    expect(page).toContain(`You traveled <!-- -->${length}<!-- --> characters to get here.`);
+    const length = new Intl.NumberFormat("en-US").format((ORIGIN + link.path).length);
+    // React separates a text node from the expression before it with an empty comment.
+    expect(page).toContain(`This link is <!-- -->${length}<!-- --> characters long.`);
   });
 
   it("tells caches and crawlers to keep away, and keeps the security headers", async () => {
@@ -174,8 +175,8 @@ describe("GET /to/* for an internationalized destination", () => {
     expect(page).toContain(
       `data-testid="destination-host">${hostInHtml("xn--exmple-cua.org")}</span>`,
     );
-    expect(page).toContain("This name uses non-Latin characters");
-    expect(page).toContain("can imitate another site");
+    expect(page).toContain("This name contains non-Latin characters");
+    expect(page).toContain("can imitate other sites");
     expect(page).not.toContain("exämple");
   });
 
@@ -197,7 +198,7 @@ describe("GET /to/* for a path that isn't a stored link", () => {
     expectLinkHeaders(response);
     const page = await response.text();
     expect(page).toContain("<h1>404</h1><p>This page doesn&#x27;t exist.</p>");
-    expect(page).toContain("If this was a stretched link, some of it is missing.");
+    expect(page).toContain("If you followed a stretched link, part of it is missing.");
   });
 
   it("needs the query string of a tracking link", async () => {
@@ -232,13 +233,15 @@ describe("GET /to/* for a destination on the security blocklist", () => {
     expect(response.headers.get("Location")).toBeNull();
     expectLinkHeaders(response);
     const page = await response.text();
-    expect(page).toContain("<h1>Link blocked.</h1>");
+    expect(page).toContain("<h1>Link blocked</h1>");
     expect(page).toContain("on a security blocklist");
     expect(page).toContain(`data-testid="blocked-host">${hostInHtml("malware.example")}</p>`);
     expect(page).not.toContain("secret-path");
     expect(page).not.toContain('href="https://malware.example');
     expect(page).not.toContain(">Continue<");
-    expect(page).toMatch(/<a href="mailto:abuse@jade\.email\?[^"]+">Report abuse<\/a>/);
+    expect(page).toMatch(
+      /<a href="mailto:abuse@jade\.email\?[^"]+">Report a problem with this link<\/a>/,
+    );
   });
 
   it("checks on every view, so a link made earlier is blocked once its name is flagged", async () => {
@@ -350,8 +353,8 @@ describe("GET /to/* for a link that was taken down", () => {
     expect(response.headers.get("Location")).toBeNull();
     expectLinkHeaders(response);
     const page = await response.text();
-    expect(page).toContain("<h1>Link removed.</h1>");
-    expect(page).toContain("This link was removed after a report.");
+    expect(page).toContain("<h1>Link removed</h1>");
+    expect(page).toContain("This link was removed after an abuse report.");
     expect(page).not.toContain("removed.example");
     expect(page).not.toContain("phishing");
     expect(page).not.toContain(">Continue<");

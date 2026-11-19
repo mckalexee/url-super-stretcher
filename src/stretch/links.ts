@@ -64,62 +64,41 @@ function isPrivateName(hostname: string): boolean {
 export function parseTarget(input: string, ownHostname: string): URL {
   const text = input.trim();
   if (text === "") {
-    throw new HttpError(400, "There's nothing here to stretch. Enter a URL first.");
+    throw new HttpError(400, "Enter a URL.");
   }
 
   const candidate =
     !SCHEME_WITH_AUTHORITY.test(text) && BARE_HOSTNAME.test(text) ? `https://${text}` : text;
   const url = parseUrl(candidate);
   if (url === null) {
-    throw new HttpError(
-      400,
-      "That doesn't look like a URL. Try something like https://example.com/page.",
-    );
+    throw new HttpError(400, "Enter a valid URL, such as https://example.com/page.");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new HttpError(
-      400,
-      "Only http and https links can be stretched. Other schemes have to stay the length they are.",
-    );
+    throw new HttpError(400, "Only http and https URLs are supported.");
   }
   if (url.username !== "" || url.password !== "") {
-    throw new HttpError(
-      400,
-      "That URL contains a username or password. Remove them, because anyone with the long link can see where it goes.",
-    );
+    throw new HttpError(400, "URLs that contain a username or password aren't supported.");
   }
   if (url.href.length > MAX_TARGET_LENGTH) {
-    throw new HttpError(400, "That URL is longer than 2,048 characters. It doesn't need our help.");
+    throw new HttpError(400, "URLs longer than 2,048 characters aren't supported.");
   }
   const hostname = normalizeHostname(url.hostname);
   // The reputation check judges names, so an address would pass it unjudged, and addresses also
   // cover every private network.
   if (hostname.startsWith("[") || IPV4_LITERAL.test(hostname)) {
-    throw new HttpError(
-      400,
-      "That URL uses an IP address instead of a name. We only stretch links to named sites. Numbers have to stay the length they are.",
-    );
+    throw new HttpError(400, "URLs that use an IP address aren't supported.");
   }
   // This comes before every check that compares names. A name such as `example.com..` keeps a
   // trailing dot after normalization, so it would match neither this site's hostname, nor a
   // private suffix, nor a ban.
   if (!isValidHostname(hostname)) {
-    throw new HttpError(
-      400,
-      "That isn't a valid hostname. Each part between the dots needs 1 to 63 characters, and the whole name at most 253. We stretch links, not the rules of DNS.",
-    );
+    throw new HttpError(400, "The hostname in that URL isn't valid.");
   }
   if (isPrivateName(hostname)) {
-    throw new HttpError(
-      400,
-      "That URL points at a private network. Our links are long, but they don't reach inside your building.",
-    );
+    throw new HttpError(400, "URLs on private networks aren't supported.");
   }
   if (hostname === normalizeHostname(ownHostname)) {
-    throw new HttpError(
-      400,
-      "That URL points at this site. A stretched link to a stretched link could go on forever, which is too long even for us.",
-    );
+    throw new HttpError(400, "URLs on this site aren't supported.");
   }
   return url;
 }

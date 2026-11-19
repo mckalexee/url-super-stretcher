@@ -1,9 +1,10 @@
 # url-super-stretcher
 
 URL Super Stretcher is a satirical website at [urlsuperstretcher.com](https://urlsuperstretcher.com)
-that does the opposite of a link shortener. You paste a URL, pick a flavor, and get an absurdly
-long link that still leads to the original. The flavors are corporate jargon, legalese, a long
-run of o's, and a pile of tracking parameters.
+that does the opposite of a link shortener. You paste a URL, pick a finish, and get an absurdly
+long link that still leads to the original. The finishes are Executive, which is corporate jargon,
+Legal, which is contract language, Extended, which is a long run of o's, and Fully loaded, which
+is a pile of tracking parameters. The code calls a finish a flavor.
 
 It's one Cloudflare Worker that serves a server-rendered web app and stores the links in Workers
 KV. Tests run in workerd, and GitHub Actions workflows cover CI, pull request Previews, and
@@ -88,6 +89,7 @@ required, because `pnpm deploy` is a built-in pnpm command.
 - [docs/testing.md](docs/testing.md): how tests run in workerd and the test helpers.
 - [docs/abuse.md](docs/abuse.md): the abuse protections, and how to take a link down, restore it,
   or ban a hostname.
+- [docs/copy.md](docs/copy.md): the voice of the site's copy and the rules for writing it.
 
 - [docs/web.md](docs/web.md): the React Router app, identity in loaders, public mode, and the
   Cloudflare Access applications.

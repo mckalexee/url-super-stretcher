@@ -359,11 +359,8 @@ describe("parseTarget", () => {
   });
 
   it("says what's wrong in each message", () => {
-    expect(rejection("")).toHaveProperty("message", expect.stringContaining("nothing"));
-    expect(rejection("not a url")).toHaveProperty(
-      "message",
-      expect.stringContaining("doesn't look like a URL"),
-    );
+    expect(rejection("")).toHaveProperty("message", expect.stringContaining("Enter a URL"));
+    expect(rejection("not a url")).toHaveProperty("message", expect.stringContaining("valid URL"));
     expect(rejection("ftp://example.com/")).toHaveProperty(
       "message",
       expect.stringContaining("http and https"),
@@ -405,7 +402,7 @@ describe("parseTarget", () => {
     ]) {
       expect(rejection(input)).toHaveProperty(
         "message",
-        expect.stringContaining("isn't a valid hostname"),
+        expect.stringContaining("hostname in that URL isn't valid"),
       );
     }
   });

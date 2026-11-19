@@ -88,7 +88,14 @@ Follow [docs/conventions.md](docs/conventions.md) for structure, comments, error
 prose: a header comment in every source file, prose JSDoc without tags on exports, comments that
 explain why, and the Google developer documentation style with no em dashes.
 
+Visitor-facing copy has its own voice and its own rules, in [docs/copy.md](docs/copy.md). That
+covers every string on a page and the word lists in `src/stretch/flavors.ts`. Read it before you
+change any of them. Claude Fable writes and reviews copy in the main session: a subagent on a
+smaller model never writes it, and the owner sees new copy before it's applied.
+
 Topic guides:
+
+- [docs/copy.md](docs/copy.md): the deadpan voice, who writes copy, and the rules for it.
 
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.

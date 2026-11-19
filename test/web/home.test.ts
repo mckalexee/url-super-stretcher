@@ -105,7 +105,7 @@ describe("POST /", () => {
     const longLink = longLinkIn(page);
     expect(longLink.startsWith("http://example.com/to/")).toBe(true);
     expect(longLink.length).toBeGreaterThan(600);
-    expect(page).toContain("Elongation report");
+    expect(page).toContain("Specifications");
   });
 
   it("reports the lengths that the server measured", async () => {
@@ -119,7 +119,15 @@ describe("POST /", () => {
     expect(page).toContain(`<td>${target.length}<!-- --> characters</td>`);
     expect(page).toContain(`<td>${format.format(longLink.length)}<!-- --> characters</td>`);
     expect(page).toContain(`<td>${format.format(longLink.length - target.length)}</td>`);
-    expect(page).toContain(`<td>${Math.ceil(longLink.length / 280)}</td>`);
+    expect(page).toContain(
+      `<th scope="row">Posts required to share, at <!-- -->280<!-- --> characters each</th><td>${Math.ceil(longLink.length / 280)}</td>`,
+    );
+    const seconds = Math.round((longLink.length / 200) * 60);
+    expect(page).toContain(
+      `<th scope="row">Time to type by hand, at <!-- -->200<!-- --> characters per minute</th><td>${Math.floor(seconds / 60)} min ${seconds % 60} s</td>`,
+    );
+    expect(page).toContain('<th scope="row">New length</th>');
+    expect(page).toContain('<th scope="row">Destination</th><td>Unchanged</td>');
   });
 
   it("adds https to a bare hostname", async () => {
@@ -162,45 +170,73 @@ describe("POST /", () => {
   );
 
   it.for([
-    ["an empty field", "", "There&#x27;s nothing here to stretch."],
-    ["text that isn't a URL", "not a url", "That doesn&#x27;t look like a URL."],
-    ["a scheme other than http or https", "ftp://example.org/file", "Only http and https links"],
+    ["an empty field", "", "Enter a URL."],
+    ["text that isn't a URL", "not a url", "Enter a valid URL, such as https://example.com/page."],
+    [
+      "a scheme other than http or https",
+      "ftp://example.org/file",
+      "Only http and https URLs are supported.",
+    ],
     [
       "a URL with credentials",
       "https://ada:pw@example.org/",
-      "That URL contains a username or password.",
+      "URLs that contain a username or password aren&#x27;t supported.",
     ],
     [
       "a URL that is too long",
       `https://example.org/${"a".repeat(2048)}`,
-      "That URL is longer than 2,048 characters.",
+      "URLs longer than 2,048 characters aren&#x27;t supported.",
     ],
-    ["a URL on this site", "http://example.com/to/anything", "That URL points at this site."],
-    ["an IP address", "http://192.0.2.7/login", "That URL uses an IP address instead of a name."],
-    ["an IPv6 address", "http://[2001:db8::1]/", "That URL uses an IP address instead of a name."],
-    ["a private-network name", "http://router.local/", "That URL points at a private network."],
-    ["a name under .lan", "http://printer.lan/", "That URL points at a private network."],
-    ["a name under .home.arpa", "http://nas.home.arpa/", "That URL points at a private network."],
-    ["a single-label name", "http://intranet/admin", "That URL points at a private network."],
+    [
+      "a URL on this site",
+      "http://example.com/to/anything",
+      "URLs on this site aren&#x27;t supported.",
+    ],
+    [
+      "an IP address",
+      "http://192.0.2.7/login",
+      "URLs that use an IP address aren&#x27;t supported.",
+    ],
+    [
+      "an IPv6 address",
+      "http://[2001:db8::1]/",
+      "URLs that use an IP address aren&#x27;t supported.",
+    ],
+    [
+      "a private-network name",
+      "http://router.local/",
+      "URLs on private networks aren&#x27;t supported.",
+    ],
+    ["a name under .lan", "http://printer.lan/", "URLs on private networks aren&#x27;t supported."],
+    [
+      "a name under .home.arpa",
+      "http://nas.home.arpa/",
+      "URLs on private networks aren&#x27;t supported.",
+    ],
+    [
+      "a single-label name",
+      "http://intranet/admin",
+      "URLs on private networks aren&#x27;t supported.",
+    ],
     [
       "a hostname with an empty label",
       "https://example.org../",
-      "That isn&#x27;t a valid hostname.",
+      "The hostname in that URL isn&#x27;t valid.",
     ],
     [
       "this site's hostname with two trailing dots",
       "http://example.com../to/x",
-      "That isn&#x27;t a valid hostname.",
+      "The hostname in that URL isn&#x27;t valid.",
     ],
     [
       "a private name with two trailing dots",
       "http://x.localhost../",
-      "That isn&#x27;t a valid hostname.",
+      "The hostname in that URL isn&#x27;t valid.",
     ],
     [
       "a hostname too long for a storage key",
       `https://${"a.".repeat(300)}com/`,
-      "That isn&#x27;t a valid hostname.",
+      "The hostname in that URL isn&#x27;t valid.",
     ],
   ] as const)("rejects %s with status 400 and keeps the input", async ([, input, message]) => {
     const response = await submitStretchForm({ url: input, flavor: "legalese" });
@@ -209,11 +245,11 @@ describe("POST /", () => {
     const page = await response.text();
     expect(page).toContain(`<p class="field-error" id="url-error">${message}`);
     expect(page).toContain('aria-invalid="true"');
-    expect(page).toContain('aria-describedby="url-error url-hint"');
+    expect(page).toContain('aria-describedby="url-error"');
     expect(page).toContain(`value="${input}"`);
     // The flavor that the visitor chose stays chosen.
     expect(page).toMatch(/<input type="radio" name="flavor" checked="" value="legalese"\/>/);
-    expect(page).not.toContain("Elongation report");
+    expect(page).not.toContain("Specifications");
   });
 
   it("rejects an unknown flavor with status 400 and keeps the URL", async () => {
@@ -221,9 +257,9 @@ describe("POST /", () => {
 
     expect(response.status).toBe(400);
     const page = await response.text();
-    expect(page).toContain('<p class="field-error" id="flavor-error">Choose one of the listed');
+    expect(page).toContain('<p class="field-error" id="flavor-error">Select a finish.');
     expect(page).toContain('value="https://example.org/"');
-    expect(page).not.toContain("Elongation report");
+    expect(page).not.toContain("Specifications");
   });
 
   it("rejects a submission without a flavor", async () => {
@@ -248,7 +284,7 @@ describe("POST / with a destination that isn't allowed", () => {
       '<p class="field-error" id="url-error">That destination is on a security blocklist.',
     );
     expect(page).toContain('value="https://malware.example/install"');
-    expect(page).not.toContain("Elongation report");
+    expect(page).not.toContain("Specifications");
   });
 
   it("asks the resolver about the hostname only", async () => {
@@ -274,9 +310,9 @@ describe("POST / with a destination that isn't allowed", () => {
     expect(response.status).toBe(400);
     const page = await response.text();
     expect(page).toContain(
-      '<p class="field-error" id="url-error">Links to that destination were removed after a report',
+      '<p class="field-error" id="url-error">Links to that destination aren&#x27;t available.',
     );
-    expect(page).not.toContain("Elongation report");
+    expect(page).not.toContain("Specifications");
     expect(lookups.count).toBe(0);
   });
 
@@ -290,7 +326,7 @@ describe("POST / with a destination that isn't allowed", () => {
     });
 
     expect(response.status).toBe(400);
-    expect(await response.text()).not.toContain("Elongation report");
+    expect(await response.text()).not.toContain("Specifications");
     expect(lookups.count).toBe(0);
   });
 
@@ -311,7 +347,7 @@ describe("POST / with a destination that isn't allowed", () => {
     });
 
     expect(response.status).toBe(400);
-    expect(await response.text()).not.toContain("Elongation report");
+    expect(await response.text()).not.toContain("Specifications");
     expect(lookups.count).toBe(0);
   });
 
@@ -335,12 +371,12 @@ describe("POST / and the creation rate limit", () => {
     expect(response.status).toBe(429);
     const page = await response.text();
     expect(page).toContain(
-      '<p class="field-error" id="url-error">That&#x27;s more than five links in a minute',
+      '<p class="field-error" id="url-error">The limit is five links per minute.',
     );
-    expect(page).toContain("Wait a minute, then stretch again.");
+    expect(page).toContain("Try again in a minute.");
     expect(page).toContain('value="https://example.org/kept"');
     expect(page).toMatch(/<input type="radio" name="flavor" checked="" value="jargon"\/>/);
-    expect(page).not.toContain("Elongation report");
+    expect(page).not.toContain("Specifications");
     expect(lookups.count).toBe(0);
     expect(put).not.toHaveBeenCalled();
   });
@@ -423,7 +459,7 @@ describe("a method other than POST to the form's action", () => {
       expect(response.headers.get("content-type")).toContain("text/html");
       const page = await response.text();
       expect(page).toContain("<h1>405</h1><p>This page doesn&#x27;t accept that method.</p>");
-      expect(page).not.toContain("Elongation report");
+      expect(page).not.toContain("Specifications");
       expect(keys).toEqual([]);
       expect(lookups.count).toBe(0);
       expect(put).not.toHaveBeenCalled();
