@@ -199,15 +199,25 @@ main > * {
   font-size: 0.8125rem;
 }
 
-/* The copyright line keeps the right edge, with or without the abuse link beside it. */
+/* The copyright line keeps the right edge, with or without the abuse link and the motion control
+   beside it. */
 .site-credit {
   margin-left: auto;
 }
 
-/* A link that stands alone is 44px tall to a finger. The padding adds the height and the margin
-   takes it back, so the text stays where it was. */
+/* The motion control is a peer of the abuse link, so it takes the footer's color and weight and
+   not the gold of a link button elsewhere. */
+.site-footer .link-button {
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* A link or a button that stands alone is 44px tall to a finger. The padding adds the height and
+   the margin takes it back, so the text stays where it was. The footer's button is listed with
+   its footer, which outranks the padding and the margin that every link button sets. */
 .site-name,
 .site-footer a,
+.site-footer .link-button,
 .result-actions a:not(.button) {
   display: inline-block;
   padding-block: 13px;

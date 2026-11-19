@@ -1,7 +1,7 @@
-// Tests that the Worker server-renders the home page and its form, that the form's action
-// stretches a link or re-renders the form with a message, that it turns away blocklisted and
-// banned destinations and clients over the rate limit, that responses carry the security headers,
-// and that an unknown path renders the error page.
+// Tests that the Worker server-renders the home page and its form, that the page is still until
+// its script runs, that the form's action stretches a link or re-renders the form with a message,
+// that it turns away blocklisted and banned destinations and clients over the rate limit, that
+// responses carry the security headers, and that an unknown path renders the error page.
 import { env, exports } from "cloudflare:workers";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -92,6 +92,15 @@ describe("GET /", () => {
     const response = await exports.default.fetch("http://example.com/");
 
     expect(await response.text()).toContain('<p class="site-credit">© 2026 Alex McKenzie</p>');
+  });
+
+  it("renders no motion control and no motion switch before the script runs", async () => {
+    const response = await exports.default.fetch("http://example.com/");
+
+    // A visitor without JavaScript gets a still page, and no button that does nothing.
+    const page = await response.text();
+    expect(page).not.toContain("Pause motion");
+    expect(page).not.toContain("data-motion");
   });
 
   it("doesn't count against the creation rate limit", async () => {
