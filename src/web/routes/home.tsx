@@ -28,15 +28,17 @@ export interface StretchStatistics {
   typingSeconds: number;
 }
 
-function measure(original: string, stretched: string): StretchStatistics {
-  const gained = stretched.length - original.length;
+// Takes lengths, not strings, so that the result view can also measure a link that is only
+// partly lit while its animation runs.
+function measure(originalLength: number, stretchedLength: number): StretchStatistics {
+  const gained = stretchedLength - originalLength;
   return {
-    originalLength: original.length,
-    stretchedLength: stretched.length,
+    originalLength,
+    stretchedLength,
     gained,
-    growthPercent: Math.round((gained / original.length) * 100),
-    posts: Math.ceil(stretched.length / POST_LENGTH),
-    typingSeconds: Math.round((stretched.length / TYPED_CHARACTERS_PER_MINUTE) * 60),
+    growthPercent: Math.round((gained / originalLength) * 100),
+    posts: Math.ceil(stretchedLength / POST_LENGTH),
+    typingSeconds: Math.round((stretchedLength / TYPED_CHARACTERS_PER_MINUTE) * 60),
   };
 }
 
@@ -129,7 +131,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const link = await createLink(env.LINKS, target, values.flavor);
   const longLink = origin.origin + link.path;
-  const statistics = measure(link.url, longLink);
+  const statistics = measure(link.url.length, longLink.length);
   // The lengths say how well the product works. The URLs stay out of the log, because a query
   // string can carry a token.
   log.info("stretch.link_created", {
@@ -181,7 +183,7 @@ function CopyButton({ text }: { text: string }) {
     <>
       <button
         type="button"
-        className="button button-primary"
+        className="button button-solid"
         onClick={() => {
           navigator.clipboard.writeText(text).then(
             () => setStatus("copied"),
@@ -200,64 +202,139 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+// How long the link takes to light, in milliseconds.
+const LIGHTING_MS = 2600;
+// The number of characters at the lit end of the link that take the accent color.
+const LEADING_EDGE = 10;
+
+// Slow at both ends and fast between them.
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+// A constant speed mixed with the eased one, so the first characters light slowly enough to
+// read and the lighting never appears to stall.
+function progress(t: number): number {
+  return 0.35 * t + 0.65 * easeInOutCubic(t);
+}
+
+/**
+ * Runs the one animation on the site: the finished link lights from the length of the visitor's
+ * own link to its full length. Returns how many characters are lit, or `null` when the link is
+ * at rest. A result that arrives without a page load animates. A result that the server
+ * rendered is at rest, and so is every result for a visitor who prefers reduced motion.
+ */
+function useLighting(originalLength: number, stretchedLength: number): number | null {
+  // True only for a component that first renders in the browser, after hydration. Deciding
+  // here, and not in an effect, makes the first painted frame the starting one.
+  const mountedInBrowser = useHydrated();
+  const from = Math.min(originalLength, stretchedLength);
+  const [animated] = useState(
+    () => mountedInBrowser && !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  const [lit, setLit] = useState<number | null>(animated ? from : null);
+
+  useEffect(() => {
+    if (!animated) {
+      return undefined;
+    }
+    const stop = new AbortController();
+    const span = stretchedLength - from;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (stop.signal.aborted) {
+        return;
+      }
+      const t = Math.min(1, (now - start) / LIGHTING_MS);
+      if (t === 1) {
+        setLit(null);
+        return;
+      }
+      setLit(Math.round(from + span * progress(t)));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => stop.abort();
+  }, [animated, from, stretchedLength]);
+  return lit;
+}
+
 function Result({ longLink, statistics }: { longLink: string; statistics: StretchStatistics }) {
   const heading = useRef<HTMLHeadingElement>(null);
   // An enhanced submission doesn't load a new page, so focus moves to the result to tell
   // keyboard and screen reader users that it arrived. The page gives each result a new key, so
   // this runs once per stretched link.
   useEffect(() => {
-    heading.current?.focus();
+    heading.current?.focus({ preventScroll: true });
   }, []);
 
+  const lit = useLighting(statistics.originalLength, statistics.stretchedLength);
+  // While the link lights, every figure describes the lit part, so the text and the numbers
+  // agree in every frame.
+  const shown = lit === null ? statistics : measure(statistics.originalLength, lit);
+  const edge = lit === null ? 0 : Math.min(LEADING_EDGE, lit);
+
   return (
-    <section aria-labelledby="result-heading">
-      <h1 id="result-heading" ref={heading} tabIndex={-1}>
-        Your link is ready
-      </h1>
-      <p className="long-link" data-testid="long-link">
-        {longLink}
-      </p>
-      <div className="result-actions">
-        <CopyButton text={longLink} />
-        <a className="button" href={longLink} rel="nofollow noreferrer">
-          Open
-        </a>
+    <section className="result" aria-labelledby="result-heading">
+      <div>
+        <h1 id="result-heading" ref={heading} tabIndex={-1}>
+          Your link is ready
+        </h1>
+        <dl className="figure">
+          <dt>Increase</dt>
+          <dd>{numberFormat.format(shown.growthPercent)}%</dd>
+        </dl>
+        <div className="result-actions">
+          <CopyButton text={longLink} />
+          <a className="button" href={longLink} rel="nofollow noreferrer">
+            Open
+          </a>
+        </div>
+        <table className="report">
+          <caption>Specifications</caption>
+          <tbody>
+            <tr>
+              <th scope="row">Original length</th>
+              <td>{numberFormat.format(shown.originalLength)} characters</td>
+            </tr>
+            <tr>
+              <th scope="row">New length</th>
+              <td>{numberFormat.format(shown.stretchedLength)} characters</td>
+            </tr>
+            <tr>
+              <th scope="row">Characters added</th>
+              <td>{numberFormat.format(shown.gained)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Posts required to share, at {POST_LENGTH} characters each</th>
+              <td>{numberFormat.format(shown.posts)}</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                Time to type by hand, at {TYPED_CHARACTERS_PER_MINUTE} characters per minute
+              </th>
+              <td>{formatDuration(shown.typingSeconds)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Destination</th>
+              <td>Unchanged</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <table className="report">
-        <caption>Specifications</caption>
-        <tbody>
-          <tr>
-            <th scope="row">Original length</th>
-            <td>{numberFormat.format(statistics.originalLength)} characters</td>
-          </tr>
-          <tr>
-            <th scope="row">New length</th>
-            <td>{numberFormat.format(statistics.stretchedLength)} characters</td>
-          </tr>
-          <tr>
-            <th scope="row">Increase</th>
-            <td>{numberFormat.format(statistics.growthPercent)}%</td>
-          </tr>
-          <tr>
-            <th scope="row">Characters added</th>
-            <td>{numberFormat.format(statistics.gained)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Posts required to share, at {POST_LENGTH} characters each</th>
-            <td>{numberFormat.format(statistics.posts)}</td>
-          </tr>
-          <tr>
-            <th scope="row">
-              Time to type by hand, at {TYPED_CHARACTERS_PER_MINUTE} characters per minute
-            </th>
-            <td>{formatDuration(statistics.typingSeconds)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Destination</th>
-            <td>Unchanged</td>
-          </tr>
-        </tbody>
-      </table>
+      {/* The whole link is in the page in every frame, so nothing moves while it lights and a
+          copy made mid-animation is still complete. */}
+      <p className="long-link" data-testid="long-link">
+        {lit === null ? (
+          longLink
+        ) : (
+          <>
+            {longLink.slice(0, lit - edge)}
+            <span className="long-link-edge">{longLink.slice(lit - edge, lit)}</span>
+            <span className="long-link-unlit">{longLink.slice(lit)}</span>
+          </>
+        )}
+      </p>
     </section>
   );
 }
@@ -288,17 +365,21 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
       {result ? (
         <Result key={result.longLink} longLink={result.longLink} statistics={result.statistics} />
       ) : (
-        <>
+        <div className="hero">
           <h1 className="hero-title">
             <span>Your link is</span> <span>too short</span>
           </h1>
           <p className="lede">Make your links appear longer and more intimidating.</p>
-        </>
+        </div>
       )}
 
-      {result ? <h2 className="again">Stretch another link</h2> : null}
       {/* A new key after each success clears the field, so the next link starts from empty. */}
-      <Form method="post" className="stretch-form" key={result?.longLink ?? "first"}>
+      <Form
+        method="post"
+        className={result ? "stretch-form again" : "stretch-form"}
+        key={result?.longLink ?? "first"}
+      >
+        {result ? <h2>Stretch another link</h2> : null}
         <div>
           <label className="field-label" htmlFor="url">
             Your link
@@ -353,7 +434,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
           )}
         </fieldset>
 
-        <button type="submit" className="button button-primary" disabled={stretching}>
+        <button type="submit" className="button" disabled={stretching}>
           {stretching ? "Stretching" : "Stretch link"}
         </button>
       </Form>

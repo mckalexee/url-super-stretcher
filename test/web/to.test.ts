@@ -89,7 +89,7 @@ describe("GET /to/* for a stored link", () => {
     const page = await (await view(link.path)).text();
 
     expect(page).toContain(
-      `<a class="button button-primary" href="${inHtml(TARGET)}" rel="noreferrer nofollow">Continue</a>`,
+      `<a class="button button-solid" href="${inHtml(TARGET)}" rel="noreferrer nofollow">Continue</a>`,
     );
     // The destination appears as a link once, and nowhere else as an address to load.
     expect(page.split(`href="${inHtml(TARGET)}"`)).toHaveLength(2);
