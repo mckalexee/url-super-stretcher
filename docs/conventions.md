@@ -77,6 +77,8 @@ Comments explain intent. The code already says what it does.
   need to identify who made a request.
 
 - Log a full URL only when it can't carry a credential. Log the path otherwise.
+- Log a request's path through `loggablePath()` from `src/stretch/log-path.ts`. A stretched
+  link's path is the whole link, and the link shows its destination to whoever has it.
 
 ## Dependencies
 

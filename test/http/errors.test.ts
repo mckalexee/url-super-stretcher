@@ -16,6 +16,9 @@ function createTestApp() {
     })
     .get("/boom", () => {
       throw new Error("database password is hunter2");
+    })
+    .get("/to/*", () => {
+      throw new Error("the link store is down");
     });
 }
 
@@ -47,6 +50,30 @@ describe("handleError", () => {
     expect(logLines(errorLog)).toEqual([
       expect.objectContaining({ event: "http.unhandled_error", method: "GET", path: "/boom" }),
     ]);
+  });
+});
+
+describe("a stretched link's path", () => {
+  // In three of the four flavors the path is the whole link, and whoever has the link can see
+  // where it leads.
+  const path = "/to/leveraging-synergies-tracked-as-action-item-0123456789abcdef0123456789abcdef";
+
+  it("stays out of the request log and the error log", async () => {
+    const infoLog = vi.spyOn(console, "info").mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await createTestApp().request(path);
+
+    expect(response.status).toBe(500);
+    expect(logLines(infoLog)).toEqual([
+      expect.objectContaining({ event: "http.request", path: "/to/*", status: 500 }),
+    ]);
+    expect(logLines(errorLog)).toEqual([
+      expect.objectContaining({ event: "http.unhandled_error", path: "/to/*" }),
+    ]);
+    const written = JSON.stringify([...infoLog.mock.calls, ...errorLog.mock.calls]);
+    expect(written).not.toContain("leveraging");
+    expect(written).not.toContain("0123456789abcdef");
   });
 });
 

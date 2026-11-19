@@ -11,6 +11,12 @@ import {
 } from "react-router";
 
 import { log } from "#lib/log.ts";
+import { loggablePath } from "#stretch/log-path.ts";
+
+// The request's path in the form that is safe to log, which hides a stretched link's path.
+function pathToLog(request: Request): string {
+  return loggablePath(new URL(request.url).pathname);
+}
 
 /** Milliseconds that React Router waits for deferred loader data before it gives up. */
 export const streamTimeout = 5_000;
@@ -29,7 +35,7 @@ export const handleError: HandleErrorFunction = (error, { request }) => {
     isRouteErrorResponse(error) && "error" in error && error.error instanceof Error
       ? error.error
       : error;
-  log.error("ssr.unhandled_error", { error: cause, path: new URL(request.url).pathname });
+  log.error("ssr.unhandled_error", { error: cause, path: pathToLog(request) });
 };
 
 /** Renders the matched routes to an HTML response. */
@@ -56,7 +62,7 @@ export default async function handleRequest(
         // `handleError`. Errors after that point happen mid-stream, so this is the only place
         // they surface.
         if (shellRendered) {
-          log.error("ssr.stream_error", { error, path: new URL(request.url).pathname });
+          log.error("ssr.stream_error", { error, path: pathToLog(request) });
         }
       },
     },

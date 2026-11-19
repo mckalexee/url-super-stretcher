@@ -22,7 +22,8 @@
     "check:deploy": "pnpm build && wrangler deploy --dry-run",
     "verify": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:deploy",
     "deploy": "pnpm build && wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "takedown": "node scripts/takedown.ts"
   },
   "dependencies": {
     "hono": "4.13.16",

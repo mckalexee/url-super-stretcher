@@ -12,9 +12,20 @@
   "upload_source_maps": true,
   "observability": {
     "enabled": true,
-    "logs": { "enabled": true },
+    // An invocation log records the whole request URL, and a stretched link's URL opens the page
+    // that shows its destination. The app's own request log has a redacted path instead.
+    "logs": { "enabled": true, "invocation_logs": false },
     "traces": { "enabled": true, "head_sampling_rate": 0.1 },
   },
+  // The stretched links. Each record maps the hash of a long link to the URL it leads to. The
+  // namespace also holds the `blocked-host:` keys that ban a hostname.
+  "kv_namespaces": [{ "binding": "LINKS", "id": "c9ef939d6306404a85ea9b4a5c2e73ba" }],
+  // Limits link creation to 5 per minute per client. The count is approximate and separate in each
+  // Cloudflare location. `namespace_id` is a positive integer in a string that this account picks,
+  // and bindings that share one share their counters.
+  "ratelimits": [
+    { "name": "CREATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 5, "period": 60 } },
+  ],
   "vars": {
     "APP_NAME": "URL Super Stretcher",
     "ENVIRONMENT": "production",
@@ -25,6 +36,8 @@
     // other application are rejected. With both empty, no request has an identity.
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": "",
+    // Where the "Report abuse" links send mail. docs/abuse.md covers what to do with a report.
+    "ABUSE_EMAIL": "abuse@jade.email",
   },
   // Previews inherit nothing from production, so every var and binding is declared again.
   // `secrets` isn't inherited either. Previews get secrets from `--secrets-file` or the base config.
@@ -36,7 +49,14 @@
       "WEB_ACCESS": "public",
       "ACCESS_TEAM_DOMAIN": "",
       "ACCESS_AUD": "",
+      "ABUSE_EMAIL": "abuse@jade.email",
     },
+    // A separate namespace keeps links made in a Preview out of production.
+    "kv_namespaces": [{ "binding": "LINKS", "id": "1018c96a87734073a9a877e34f9b42f2" }],
+    // A separate namespace keeps traffic to a Preview from using up a visitor's production limit.
+    "ratelimits": [
+      { "name": "CREATE_LIMITER", "namespace_id": "4202", "simple": { "limit": 5, "period": 60 } },
+    ],
   },
   // Fakes `ctx.access` under `pnpm dev`. Production has no `ctx.access` behind the static assets
   // router. `src/http/access.ts` accepts the fake only when `aud` equals `ACCESS_AUD`, so keep the

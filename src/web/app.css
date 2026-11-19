@@ -1,0 +1,481 @@
+/*
+ * Stylesheet for the whole web app. The visual idea is a measuring tape: tape yellow with ruled
+ * tick marks appears where length is the subject, and everything else stays quiet. Fonts come from
+ * system stacks, so the page calls no third-party origin.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #eef1f4;
+  --surface: #ffffff;
+  --ink: #1b2a4a;
+  --muted: #55627a;
+  --rule: #c5ccd8;
+  --tape: #ffd23f;
+  --tape-ink: #1b2a4a;
+  --alert: #b3192e;
+  --focus: #1d5fd1;
+
+  --font-display:
+    "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Franklin Gothic Medium",
+    "Helvetica Neue", sans-serif;
+  --font-body:
+    "Avenir Next", Avenir, "Segoe UI Variable Text", "Segoe UI", Ubuntu, "Helvetica Neue",
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --measure: 42rem;
+  --gutter: clamp(1rem, 5vw, 2.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #101a30;
+    --surface: #18243f;
+    --ink: #e9edf5;
+    --muted: #a7b2c8;
+    --rule: #34425f;
+    --alert: #ff9aa6;
+    --focus: #ffd23f;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.08em;
+}
+
+a:hover {
+  text-decoration-thickness: 0.16em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-weight: 800;
+  line-height: 1.02;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.75rem, 13vw, 5.5rem);
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: clamp(2rem, 8vw, 3rem);
+}
+
+p {
+  margin: 0;
+}
+
+/* Shell */
+
+.site-header,
+.site-footer,
+main {
+  width: 100%;
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-block: 1rem;
+}
+
+.site-name {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-weight: 800;
+  font-size: 1.375rem;
+  text-decoration: none;
+}
+
+.site-name:hover {
+  text-decoration: underline;
+}
+
+.site-claim {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/*
+ * The tape. Fine ticks every 8px and a taller tick every 80px, ruled along the top edge the way a
+ * tape measure is printed.
+ */
+.tape {
+  background:
+    repeating-linear-gradient(90deg, var(--tape-ink) 0 2px, transparent 2px 80px) 0 0 / 100% 14px
+      no-repeat,
+    repeating-linear-gradient(90deg, var(--tape-ink) 0 1px, transparent 1px 8px) 0 0 / 100% 7px
+      no-repeat,
+    var(--tape);
+  color: var(--tape-ink);
+}
+
+.tape-strip {
+  height: 1.5rem;
+}
+
+main {
+  padding-block: clamp(2rem, 8vw, 4.5rem) 3rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--rule);
+  padding-block: 1.25rem 2.5rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* Hero */
+
+.hero-title {
+  transform-origin: left center;
+  animation: stretch 900ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+/* The one moment of motion: the headline arrives squeezed and is pulled out to full width. */
+@keyframes stretch {
+  from {
+    transform: scaleX(0.45);
+  }
+}
+
+.lede {
+  margin-top: 1.25rem;
+  font-size: 1.25rem;
+  line-height: 1.45;
+  max-width: 34rem;
+}
+
+/* Form */
+
+.stretch-form {
+  margin-top: 2.5rem;
+  display: grid;
+  gap: 2rem;
+}
+
+.field-label,
+.flavors legend {
+  display: block;
+  padding: 0;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.field-input {
+  display: block;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+}
+
+.field-input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.field-input[aria-invalid="true"] {
+  border-color: var(--alert);
+}
+
+.field-hint {
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.field-error {
+  margin-top: 0.5rem;
+  color: var(--alert);
+  font-weight: 700;
+}
+
+.flavors {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.flavor-list {
+  border-top: 1px solid var(--rule);
+}
+
+.flavor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.85rem;
+  align-items: start;
+  padding: 0.85rem 0.75rem 0.85rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  border-left: 6px solid transparent;
+  cursor: pointer;
+}
+
+.flavor:has(input:checked) {
+  border-left-color: var(--tape);
+  background: var(--surface);
+}
+
+.flavor input {
+  grid-row: span 2;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.25rem 0 0;
+  accent-color: var(--ink);
+}
+
+.flavor-name {
+  font-weight: 700;
+}
+
+.flavor-description {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.8rem 1.4rem;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--surface);
+}
+
+.button-primary {
+  border-color: var(--tape-ink);
+  background: var(--tape);
+  color: var(--tape-ink);
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  font-weight: 800;
+  font-size: 1.375rem;
+  padding: 0.7rem 1.75rem;
+  justify-self: start;
+}
+
+.button-primary:hover {
+  background: #ffe07a;
+}
+
+.button-primary[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+@media (prefers-color-scheme: dark) {
+  .button-primary {
+    border-color: var(--tape);
+  }
+}
+
+/* Result */
+
+/* The script moves focus to the result heading to announce it. A heading isn't a control, so it
+   shows no focus ring. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
+.result-lede {
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+}
+
+/*
+ * The long link is shown whole and wraps anywhere, because its length is the point. One click or
+ * tap selects all of it, so copying works without the script.
+ */
+.long-link {
+  margin-top: 1.5rem;
+  padding: 1.6rem 1rem 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.copy-status {
+  font-weight: 700;
+}
+
+.report {
+  width: 100%;
+  margin-top: 2.5rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.report caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 0.5rem;
+}
+
+.report th,
+.report td {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+  vertical-align: baseline;
+}
+
+.report th {
+  text-align: left;
+  font-weight: 400;
+  padding-right: 1rem;
+}
+
+.report td {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.report tr:last-child th,
+.report tr:last-child td {
+  border-bottom: 1px solid var(--rule);
+}
+
+.again {
+  margin-top: 3.5rem;
+}
+
+/* Stretched link pages */
+
+/*
+ * The destination's name is the largest thing on the page, so a visitor reads it before anything
+ * else. It's set in the monospace face, where look-alike characters such as l, I, and 1 differ.
+ * The markup lets it wrap before each dot, and it wraps anywhere when a single label is wider
+ * than the page, because a name can be 253 characters long.
+ */
+.destination-label {
+  display: block;
+  font-family: var(--font-body);
+  font-stretch: normal;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+.destination-host {
+  display: block;
+  font-family: var(--font-mono);
+  font-stretch: normal;
+  font-size: clamp(1.5rem, 5.5vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+main > p.destination-host {
+  margin-top: 1.5rem;
+}
+
+.destination-url {
+  margin-top: 1.5rem;
+  padding: 0.8rem 0.9rem;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.journey {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+/* Error and plain pages */
+
+.error-note {
+  margin-top: 0.75rem;
+  color: var(--muted);
+}
+
+main > h1 + p,
+main > h1 + dl {
+  margin-top: 1rem;
+}
+
+dt {
+  font-weight: 700;
+}
+
+dd {
+  margin: 0 0 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title {
+    animation: none;
+  }
+}

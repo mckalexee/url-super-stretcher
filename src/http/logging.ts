@@ -1,13 +1,16 @@
 // Request logging for the Hono app. Each request produces one `http.request` line with the
 // method, path, status, and duration, which is enough to find slow or failing routes in Workers
-// Logs.
+// Logs. A path isn't always safe to log: a stretched link's path is the link, so it's logged as
+// fixed text.
 import type { MiddlewareHandler } from "hono";
 
 import { log } from "#lib/log.ts";
+import { loggablePath } from "#stretch/log-path.ts";
 
 /**
- * Logs one `http.request` event after the response is ready. It logs the path without the query
- * string, and never logs headers, because both can carry credentials.
+ * Logs one `http.request` event after the response is ready. It never logs the query string or
+ * the headers, because both can carry credentials, and it logs a stretched link's path as
+ * `/to/*`, because the path alone opens the page that shows the link's destination.
  */
 export const logRequests: MiddlewareHandler = async (c, next) => {
   // Workers advance the clock only during I/O, so the duration measures time spent waiting on
@@ -16,7 +19,7 @@ export const logRequests: MiddlewareHandler = async (c, next) => {
   await next();
   log.info("http.request", {
     method: c.req.method,
-    path: c.req.path,
+    path: loggablePath(c.req.path),
     status: c.res.status,
     durationMs: Date.now() - start,
   });

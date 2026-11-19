@@ -7,16 +7,6 @@ Halves present: web app.
 
 The web app is React Router 8 behind Hono, and Cloudflare Access can make it private.
 
-## What to build
-
-Stretches any URL into an absurdly long link that still redirects to the original, a satire of link
-shorteners. First, build a home page where a visitor pastes a URL and picks a flavor (corporate
-jargon, legalese, a long run of o's, or a tracking-parameter pile), and a redirect route that
-resolves the long link from KV storage.
-
-The person who started this project wrote this brief during setup. Change it as the plan changes,
-and delete this section once it stops helping.
-
 ## Commands
 
 ```sh
@@ -29,6 +19,7 @@ pnpm test test/http/healthz.test.ts  # one test file
 pnpm fmt                             # fix formatting
 pnpm typegen                         # regenerate the generated types
 pnpm tail                            # stream the deployed Worker's live logs
+pnpm takedown '<long link URL>'      # disable a reported link, see docs/abuse.md
 ```
 
 - A change is done when `pnpm verify` passes. Run it before you report a change as finished.
@@ -69,6 +60,20 @@ module outside the current directory through its `#` subpath with the file exten
 - pnpm refuses a dependency version that's younger than one day. To use one, commit its
   `minimumReleaseAgeExclude` entry in `pnpm-workspace.yaml`, or pick an older version.
 
+- A stretched link's KV key is `link:` plus the SHA-256 of everything after `/to/` in its path
+  and query, because a KV key is limited to 512 bytes and a link is longer. Never use the link
+  itself as a key. `linkKey()` in `src/stretch/records.ts` is the one place that derives it.
+- A KV key `blocked-host:<hostname>` in the same namespace bans a hostname: lowercase, no
+  trailing dot, ASCII form. Only its existence matters. The match is exact, so it doesn't cover
+  subdomains.
+- A stretched link's page never redirects: no `Location` header, no meta refresh, no script. The
+  visitor follows a plain link.
+- `src/stretch/records.ts` and `src/stretch/takedown.ts` also run in Node.js, for
+  `scripts/takedown.ts`. Keep bindings and other Workers-only APIs and types out of them.
+- A failed reputation check lets a link through. Never turn a resolver outage into an error.
+- Never log a stretched link's path, because the path is the link. Pass every request path that
+  you log through `loggablePath()` in `src/stretch/log-path.ts`.
+
 - Identity goes through `src/http/access.ts`. `ctx.access` is absent behind the static assets
   router in production, so `access.ts` verifies the `Cf-Access-Jwt-Assertion` header itself.
   Don't read `ctx.access` anywhere else.
@@ -87,5 +92,6 @@ Topic guides:
 
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.
+- [docs/abuse.md](docs/abuse.md): the abuse protections, takedowns, and hostname bans.
 
 - [docs/web.md](docs/web.md): the web app, identity, and the Cloudflare Access applications.

@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { HttpError, UpstreamError } from "#lib/errors.ts";
 import { log } from "#lib/log.ts";
+import { loggablePath } from "#stretch/log-path.ts";
 
 /** Body of every error response from the HTTP layer. */
 export interface ErrorBody {
@@ -21,7 +22,7 @@ function errorResponse(status: number, message: string): Response {
  * else is logged and becomes a generic 500 response, so the client never sees internal detail.
  */
 export const handleError: ErrorHandler = (error, c) => {
-  const fields = { method: c.req.method, path: c.req.path };
+  const fields = { method: c.req.method, path: loggablePath(c.req.path) };
 
   if (error instanceof UpstreamError) {
     log.warn("http.upstream_error", {

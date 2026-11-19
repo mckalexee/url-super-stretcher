@@ -63,9 +63,10 @@ private site without one.
 ### The public list
 
 `PUBLIC_PATHS` in `src/web/root.tsx` lists the route patterns that anyone may see on a private
-site, written the way React Router reports them, such as `/` or `/blog/:slug`. Every other route
-needs an identity, so a new route stays private until you add it to the list. The template lists
-only `/`.
+site, written the way React Router reports them: `/` for the index route, and the path from
+`src/web/routes.ts` without a leading slash for any other, such as `blog/:slug`. Every other route
+needs an identity, so a new route stays private until you add it to the list. The list holds `/`
+and `to/*`, the page of a stretched link.
 
 ### Where the identity comes from
 
@@ -149,17 +150,36 @@ cache write.
 A route that throws `data({ message }, { status })` gets that message on the error page from the
 root `ErrorBoundary`. Any other error renders a generic message.
 
+A loader that needs the address of the page reads the `url` argument, not `request.url`. On the
+data request that React Router makes for a client-side navigation, the path in `request.url` ends
+in `.data`.
+
+To send headers with a page, return `data(value, { headers })` from the loader and export a
+`headers` function that returns `loaderHeaders`, as `src/web/routes/to.tsx` does. For a thrown
+response, only the root route's `headers` export runs, and it passes the thrown headers through.
+An error that isn't a thrown response, which renders as a 500, gets none of them.
+
 ## Errors and logging
 
 `src/web/entry.server.tsx` exports `handleError`, which React Router calls for an error that a
 loader, an action, or rendering throws. It logs `ssr.unhandled_error` with the path, and skips
-requests that the client aborted. Errors that happen after the HTML shell has started streaming
+requests that the client aborted. Every logged path goes through `loggablePath()` from
+`src/stretch/log-path.ts`, which writes a stretched link's path as `/to/*`. Errors that happen after the HTML shell has started streaming
 surface in `onError`, which logs them as `ssr.stream_error`. `isbot` detects crawlers, which get
 the complete document instead of a stream. `streamTimeout` gives deferred loader data five seconds.
 
+## Stylesheet
+
+The site has one hand-written stylesheet, `src/web/app.css`. `src/web/root.tsx` imports its URL
+with `./app.css?url` and returns it from the `links` export, so every page loads it, including the
+error page. Fonts come from system font stacks, so the page calls no third-party origin.
+
+The `?url` import has no value in the test runtime, so the tests can't check the stylesheet link.
+To check it, load a page from `pnpm dev` or read the build output.
+
 ## Add Tailwind CSS
 
-The template ships without a CSS framework. To add Tailwind CSS 4:
+The site ships without a CSS framework. To add Tailwind CSS 4:
 
 1. Install the packages:
 
@@ -176,20 +196,13 @@ The template ships without a CSS framework. To add Tailwind CSS 4:
    tailwindcss(),
    ```
 
-3. Create `src/web/app.css`:
+3. Add the import as the first line of `src/web/app.css`:
 
    ```css
    @import "tailwindcss";
    ```
 
-4. In `src/web/root.tsx`, import the stylesheet's URL and export a `links` function:
-
-   ```tsx
-   import stylesheet from "./app.css?url";
-
-   /** Loads the Tailwind stylesheet on every page. */
-   export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
-   ```
+4. Keep the `links` export in `src/web/root.tsx`, which already loads that stylesheet.
 
 5. Run `pnpm verify`.
 

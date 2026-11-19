@@ -1,14 +1,26 @@
 # url-super-stretcher
 
-A Cloudflare Worker with tests that run in workerd and GitHub Actions workflows for CI, pull
-request Previews, and production deploys.
+URL Super Stretcher is a satirical website at [urlsuperstretcher.com](https://urlsuperstretcher.com)
+that does the opposite of a link shortener. You paste a URL, pick a flavor, and get an absurdly
+long link that still leads to the original. The flavors are corporate jargon, legalese, a long
+run of o's, and a pile of tracking parameters.
 
-It serves a server-rendered web app, which Cloudflare Access can make private.
+It's one Cloudflare Worker that serves a server-rendered web app and stores the links in Workers
+KV. Tests run in workerd, and GitHub Actions workflows cover CI, pull request Previews, and
+production deploys.
 
 ## What you get
 
-**Web app.** A React Router 8 app rendered on the server, behind Hono. Cloudflare Access identity
-reaches loaders and API routes.
+**Web app.** A React Router 8 app rendered on the server, behind Hono. The home page's form works
+without JavaScript. Cloudflare Access identity reaches loaders and API routes.
+
+**Stretched links.** `src/stretch` writes the long links and stores them in the `LINKS` KV
+namespace. `GET /to/*` renders a page that shows where a stored link leads, and the visitor
+chooses whether to continue. The page never redirects.
+
+**Abuse protections.** A reputation check against Cloudflare's malware-blocking DNS resolver, a
+rate limit on new links, a takedown command, and a report link on every page.
+[docs/abuse.md](docs/abuse.md) covers them.
 
 **Tooling.** Hono serves `/healthz` and maps errors to responses. Tests run in workerd, the same
 runtime as production, with no network access. GitHub Actions run CI on every pull request, deploy
@@ -51,7 +63,10 @@ The dev server listens on port 5173 and stops if another process holds that port
 
 - `http://localhost:5173/healthz`: the health check.
 
-- `http://localhost:5173/`: the web app's home page.
+- `http://localhost:5173/`: the home page, with the form that stretches a link.
+- `http://localhost:5173/to/...`: a stretched link's page, which shows the destination and a
+  **Continue** link. A path that isn't a stored link gets the 404 page, a link that was taken down
+  gets a 410 page, and a destination on a security blocklist gets a 403 page.
 - `http://localhost:5173/account`: the signed-in Access identity, or a public-mode note.
 - `http://localhost:5173/api/me`: the same identity as JSON.
 
@@ -71,6 +86,8 @@ required, because `pnpm deploy` is a built-in pnpm command.
   logging, dependencies, and writing style.
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, custom domains, Renovate, and observability.
 - [docs/testing.md](docs/testing.md): how tests run in workerd and the test helpers.
+- [docs/abuse.md](docs/abuse.md): the abuse protections, and how to take a link down, restore it,
+  or ban a hostname.
 
 - [docs/web.md](docs/web.md): the React Router app, identity in loaders, public mode, and the
   Cloudflare Access applications.
