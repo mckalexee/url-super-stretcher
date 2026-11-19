@@ -1,29 +1,14 @@
 // Storage for stretched links, and the checks on a URL before it becomes one. A link lives in
-// Workers KV as one JSON record. A KV key holds at most 512 bytes and a stretched link is longer,
-// so the key is a hash of the link, and the record repeats the link for an exact comparison.
-import { z } from "zod";
-
+// Workers KV as one JSON record, whose shape and key `records.ts` defines. The same namespace
+// holds the `blocked-host:` keys that ban a hostname, so one lookup here answers whether a link
+// still works.
 import { HttpError } from "#lib/errors.ts";
 
-import { generateStretch, isFlavorId } from "./flavors.ts";
+import { generateStretch } from "./flavors.ts";
 import type { FlavorId, RandomSource } from "./flavors.ts";
-
-/** A stretched link and the URL that it redirects to. */
-export interface StretchedLink {
-  /** The URL that the link redirects to. */
-  url: string;
-  /** The flavor that wrote the link. */
-  flavor: FlavorId;
-  /** The path and query of the link on this site, starting with `LINK_PREFIX`. */
-  path: string;
-  /** When the link was created, as an ISO 8601 timestamp. */
-  createdAt: string;
-}
-
-/** The path prefix that every stretched link starts with. */
-export const LINK_PREFIX = "/to/";
-
-const KEY_PREFIX = "link:";
+import { LINK_PREFIX } from "./prefix.ts";
+import { blockedHostKey, linkKey, normalizeHostname, parseRecord, stretchOf } from "./records.ts";
+import type { StretchedLink } from "./records.ts";
 
 // Longer URLs than this fail in some browsers and proxies, and a stretched link adds its own
 // length on top.
@@ -36,15 +21,13 @@ const SCHEME_WITH_AUTHORITY = /^[a-z][a-z0-9+.-]*:\/\//i;
 // credentials stays as typed and fails the scheme check or the credentials check.
 const BARE_HOSTNAME = /^[^\s/?#:@]+\.[^\s/?#:@]+(:\d+)?([/?#].*)?$/;
 
-// A record is read back long after it was written, and anyone with access to the namespace can
-// write one, so the shape is checked on the way out. The scheme check means that a redirect
-// never sends a visitor to a `javascript:` or `data:` URL.
-const storedLink = z.object({
-  url: z.url({ protocol: /^https?$/ }),
-  flavor: z.custom<FlavorId>((value) => typeof value === "string" && isFlavorId(value)),
-  path: z.string(),
-  createdAt: z.iso.datetime(),
-});
+// The URL parser rewrites every spelling of an IPv4 address, such as `0x7f.1` or `2130706433`,
+// to four decimal numbers, and keeps an IPv6 address in brackets.
+const IPV4_LITERAL = /^\d+\.\d+\.\d+\.\d+$/;
+
+// Names that resolve only inside a machine or a private network. The resolver that judges
+// destinations can't see them, and a public link has no business pointing at them.
+const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal"];
 
 function parseUrl(text: string): URL | null {
   try {
@@ -54,17 +37,17 @@ function parseUrl(text: string): URL | null {
   }
 }
 
-// A fully qualified hostname can end in a dot and still names the same host.
-function withoutTrailingDot(hostname: string): string {
-  return hostname.toLowerCase().replace(/\.$/, "");
+function isPrivateName(hostname: string): boolean {
+  return hostname === "localhost" || PRIVATE_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
 }
 
 /**
- * Turns what a visitor typed into the URL to redirect to. Input without a scheme that looks like
- * a hostname gets `https://`. The function throws an `HttpError` with status 400, and a message
- * written for the page, when the input is empty, isn't a URL, isn't `http` or `https`, carries a
- * username or password, is longer than 2,048 characters, or points at `ownHostname`. A stretched
- * link that points at this site can redirect to itself forever.
+ * Turns what a visitor typed into the URL that the link leads to. Input without a scheme that
+ * looks like a hostname gets `https://`. The function throws an `HttpError` with status 400, and
+ * a message written for the page, when the input is empty, isn't a URL, isn't `http` or `https`,
+ * carries a username or password, is longer than 2,048 characters, names an IP address or a
+ * private-network hostname, or points at `ownHostname`. A stretched link that points at this site
+ * can lead to itself forever.
  */
 export function parseTarget(input: string, ownHostname: string): URL {
   const text = input.trim();
@@ -96,7 +79,22 @@ export function parseTarget(input: string, ownHostname: string): URL {
   if (url.href.length > MAX_TARGET_LENGTH) {
     throw new HttpError(400, "That URL is longer than 2,048 characters. It doesn't need our help.");
   }
-  if (withoutTrailingDot(url.hostname) === withoutTrailingDot(ownHostname)) {
+  const hostname = normalizeHostname(url.hostname);
+  // The reputation check judges names, so an address would pass it unjudged, and addresses also
+  // cover every private network.
+  if (hostname.startsWith("[") || IPV4_LITERAL.test(hostname)) {
+    throw new HttpError(
+      400,
+      "That URL uses an IP address instead of a name. We only stretch links to named sites. Numbers have to stay the length they are.",
+    );
+  }
+  if (isPrivateName(hostname)) {
+    throw new HttpError(
+      400,
+      "That URL points at a private network. Our links are long, but they don't reach inside your building.",
+    );
+  }
+  if (hostname === normalizeHostname(ownHostname)) {
     throw new HttpError(
       400,
       "That URL points at this site. A stretched link to a stretched link could go on forever, which is too long even for us.",
@@ -105,10 +103,12 @@ export function parseTarget(input: string, ownHostname: string): URL {
   return url;
 }
 
-async function keyFor(stretch: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stretch));
-  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"));
-  return KEY_PREFIX + hex.join("");
+/**
+ * Reports whether a takedown banned the hostname, which is true when its `blocked-host:` key
+ * exists. The match is exact, so a ban on `example.com` doesn't cover `www.example.com`.
+ */
+export async function isHostBlocked(kv: KVNamespace, hostname: string): Promise<boolean> {
+  return (await kv.get(blockedHostKey(hostname))) !== null;
 }
 
 /**
@@ -128,38 +128,49 @@ export async function createLink(
     path: LINK_PREFIX + stretch,
     createdAt: new Date().toISOString(),
   };
-  await kv.put(await keyFor(stretch), JSON.stringify(link));
+  await kv.put(await linkKey(stretch), JSON.stringify(link));
   return link;
 }
 
 /**
- * Finds the link for a request's pathname plus search, such as `/to/landing?utm_source=x`. It
+ * Finds the record for a request's pathname plus search, such as `/to/landing?utm_source=x`. It
  * returns `null` when no stored link has exactly that path and query, and when the stored record
- * isn't a valid link.
+ * isn't a valid link. A link that was taken down is still found, with `disabledAt` set, so use
+ * `resolveLink` to decide what a visitor sees.
  */
 export async function findLink(
   kv: KVNamespace,
   pathAndQuery: string,
 ): Promise<StretchedLink | null> {
-  if (!pathAndQuery.startsWith(LINK_PREFIX) || pathAndQuery.length === LINK_PREFIX.length) {
+  const stretch = stretchOf(pathAndQuery);
+  if (stretch === null) {
     return null;
   }
-  const text = await kv.get(await keyFor(pathAndQuery.slice(LINK_PREFIX.length)));
-  if (text === null) {
-    return null;
-  }
+  const text = await kv.get(await linkKey(stretch));
+  return text === null ? null : parseRecord(text, pathAndQuery);
+}
 
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return null;
+/**
+ * What a visitor to a link's path gets: nothing, because no such link exists, a notice that the
+ * link was removed, or the link.
+ */
+export type LinkLookup =
+  | { state: "missing" }
+  | { state: "removed" }
+  | { state: "active"; link: StretchedLink };
+
+/**
+ * Finds the link for a request's pathname plus search and says whether it still works. A link is
+ * `removed` when its record was disabled or its destination's hostname was banned, so one
+ * `blocked-host:` key takes down every link to that hostname.
+ */
+export async function resolveLink(kv: KVNamespace, pathAndQuery: string): Promise<LinkLookup> {
+  const link = await findLink(kv, pathAndQuery);
+  if (link === null) {
+    return { state: "missing" };
   }
-  const parsed = storedLink.safeParse(json);
-  // The hash already matches, so a different path means that the record is wrong, not that two
-  // links share a hash.
-  if (!parsed.success || parsed.data.path !== pathAndQuery) {
-    return null;
+  if (link.disabledAt !== undefined || (await isHostBlocked(kv, new URL(link.url).hostname))) {
+    return { state: "removed" };
   }
-  return parsed.data;
+  return { state: "active", link };
 }

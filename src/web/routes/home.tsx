@@ -7,7 +7,8 @@ import { data, Form, useNavigation } from "react-router";
 import { HttpError } from "#lib/errors.ts";
 import { log } from "#lib/log.ts";
 import { FLAVORS, isFlavorId } from "#stretch/flavors.ts";
-import { createLink, parseTarget } from "#stretch/links.ts";
+import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
+import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 
 import type { Route } from "./+types/home.ts";
@@ -39,6 +40,11 @@ function measure(original: string, stretched: string): StretchStatistics {
   };
 }
 
+// The rate limiter's key for a request that has no client address. Cloudflare sets
+// `CF-Connecting-IP` on every request it proxies, so only local development and tests share this
+// key.
+const UNKNOWN_CLIENT = "unknown";
+
 // A file upload in a text field's place counts as an empty field.
 function textField(form: FormData, name: string): string {
   const value = form.get(name);
@@ -56,7 +62,9 @@ export function loader() {
 /**
  * Stretches the submitted URL and stores the link. A rejected input comes back with status 400,
  * the visitor's values, and a message for the field at fault, so the form renders again with
- * nothing lost. Any other failure propagates to the error boundary.
+ * nothing lost. A destination that was banned or that is on a security blocklist is rejected the
+ * same way. A client that creates more than five links a minute gets status 429. Any other
+ * failure propagates to the error boundary.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   const { env } = context.get(cloudflareContext);
@@ -76,17 +84,45 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
 
+  const reject = (status: number, message: string) =>
+    data({ ok: false as const, field: "url" as const, message, values }, { status });
+
   let target: URL;
   try {
     target = parseTarget(values.url, origin.hostname);
   } catch (error) {
     if (error instanceof HttpError) {
-      return data(
-        { ok: false as const, field: "url" as const, message: error.message, values },
-        { status: error.status },
-      );
+      return reject(error.status, error.message);
     }
     throw error;
+  }
+
+  // Only a submission that would create a link counts against the limit, so this comes after the
+  // input checks. It comes before every lookup, so a flood costs one call each and nothing more.
+  const client = request.headers.get("CF-Connecting-IP") ?? UNKNOWN_CLIENT;
+  const { success } = await env.CREATE_LIMITER.limit({ key: client });
+  if (!success) {
+    log.info("stretch.rate_limited");
+    return reject(
+      429,
+      "That's more than five links in a minute, which is our limit. Wait a minute, then stretch again. Quality elongation takes time.",
+    );
+  }
+
+  if (await isHostBlocked(env.LINKS, target.hostname)) {
+    return reject(
+      400,
+      "Links to that destination were removed after a report, and we don't stretch new ones.",
+    );
+  }
+  // A failed check lets the link through, because an outage of the resolver must not take the
+  // site down. The link's page checks again on every view.
+  if ((await checkReputation(target.hostname)) === "flagged") {
+    log.info("stretch.target_flagged", { hostname: target.hostname });
+    return reject(
+      400,
+      "That destination is on a security blocklist. We don't stretch links to it, at any length.",
+    );
   }
 
   const link = await createLink(env.LINKS, target, values.flavor);

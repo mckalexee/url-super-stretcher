@@ -1,16 +1,52 @@
 // Tests that the Worker server-renders the home page and its form, that the form's action
-// stretches a link or re-renders the form with a message, that responses carry the security
-// headers, and that an unknown path renders the error page.
-import { exports } from "cloudflare:workers";
+// stretches a link or re-renders the form with a message, that it turns away blocklisted and
+// banned destinations and clients over the rate limit, that responses carry the security headers,
+// and that an unknown path renders the error page.
+import { env, exports } from "cloudflare:workers";
+import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FLAVORS } from "#stretch/flavors.ts";
+import { blockedHostKey } from "#stretch/records.ts";
 
+import { cleanAnswer, RESOLVER_URL, resolver, useResolver } from "../helpers/reputation.ts";
 import { longLinkIn, submitStretchForm } from "../helpers/stretch.ts";
+
+const network = useResolver();
+const realLimiter = env.CREATE_LIMITER;
 
 afterEach(() => {
   vi.restoreAllMocks();
+  env.CREATE_LIMITER = realLimiter;
 });
+
+/**
+ * Replaces the rate limiter with one that gives a fixed answer and records the key of each call.
+ * The real binding counts in windows aligned to the wall clock, so a test can't drive it over
+ * its limit at a known request.
+ */
+function useFakeLimiter(success: boolean): string[] {
+  const keys: string[] = [];
+  env.CREATE_LIMITER = {
+    limit({ key }) {
+      keys.push(key);
+      return Promise.resolve({ success });
+    },
+  };
+  return keys;
+}
+
+/** Replaces the resolver with a clean one that counts its lookups. */
+function countLookups(): { count: number } {
+  const lookups = { count: 0 };
+  network.use(
+    http.get(RESOLVER_URL, () => {
+      lookups.count += 1;
+      return HttpResponse.json(cleanAnswer("example.org"));
+    }),
+  );
+  return lookups;
+}
 
 describe("GET /", () => {
   it("renders the form with the URL field and every flavor", async () => {
@@ -31,6 +67,21 @@ describe("GET /", () => {
     const response = await exports.default.fetch("http://example.com/");
 
     expect((await response.text()).match(/ checked=""/g)).toHaveLength(1);
+  });
+
+  it("links the footer to the abuse address from the ABUSE_EMAIL var", async () => {
+    const response = await exports.default.fetch("http://example.com/");
+
+    expect(env.ABUSE_EMAIL).toBe("abuse@jade.email");
+    expect(await response.text()).toContain('<a href="mailto:abuse@jade.email">Report abuse</a>');
+  });
+
+  it("doesn't count against the creation rate limit", async () => {
+    const keys = useFakeLimiter(true);
+
+    await exports.default.fetch("http://example.com/");
+
+    expect(keys).toEqual([]);
   });
 
   it("sends the security headers without a policy that would block hydration", async () => {
@@ -114,6 +165,9 @@ describe("POST /", () => {
       "That URL is longer than 2,048 characters.",
     ],
     ["a URL on this site", "http://example.com/to/anything", "That URL points at this site."],
+    ["an IP address", "http://192.0.2.7/login", "That URL uses an IP address instead of a name."],
+    ["an IPv6 address", "http://[2001:db8::1]/", "That URL uses an IP address instead of a name."],
+    ["a private-network name", "http://router.local/", "That URL points at a private network."],
   ] as const)("rejects %s with status 400 and keeps the input", async ([, input, message]) => {
     const response = await submitStretchForm({ url: input, flavor: "legalese" });
 
@@ -142,6 +196,141 @@ describe("POST /", () => {
     const response = await submitStretchForm({ url: "https://example.org/" });
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("POST / with a destination that isn't allowed", () => {
+  it("rejects a destination on the security blocklist with status 400", async () => {
+    network.use(resolver("malware.example"));
+
+    const response = await submitStretchForm({
+      url: "https://malware.example/install",
+      flavor: "ooo",
+    });
+
+    expect(response.status).toBe(400);
+    const page = await response.text();
+    expect(page).toContain(
+      '<p class="field-error" id="url-error">That destination is on a security blocklist.',
+    );
+    expect(page).toContain('value="https://malware.example/install"');
+    expect(page).not.toContain("Elongation report");
+  });
+
+  it("asks the resolver about the hostname only", async () => {
+    const names: (string | null)[] = [];
+    network.use(
+      http.get(RESOLVER_URL, ({ request }) => {
+        names.push(new URL(request.url).searchParams.get("name"));
+        return HttpResponse.json(cleanAnswer("example.org"));
+      }),
+    );
+
+    await submitStretchForm({ url: "https://Example.org:8443/a?token=secret", flavor: "ooo" });
+
+    expect(names).toEqual(["example.org"]);
+  });
+
+  it("rejects a destination on a blocked hostname with status 400, without a lookup", async () => {
+    await env.LINKS.put(blockedHostKey("banned.example"), "{}");
+    const lookups = countLookups();
+
+    const response = await submitStretchForm({ url: "https://Banned.example/x", flavor: "ooo" });
+
+    expect(response.status).toBe(400);
+    const page = await response.text();
+    expect(page).toContain(
+      '<p class="field-error" id="url-error">Links to that destination were removed after a report',
+    );
+    expect(page).not.toContain("Elongation report");
+    expect(lookups.count).toBe(0);
+  });
+
+  it("stretches a link to a subdomain of a blocked hostname, because the match is exact", async () => {
+    await env.LINKS.put(blockedHostKey("banned.example"), "{}");
+
+    const response = await submitStretchForm({ url: "https://www.banned.example/", flavor: "ooo" });
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe("POST / and the creation rate limit", () => {
+  it("answers 429 with the input kept, before the reputation lookup and the write", async () => {
+    useFakeLimiter(false);
+    const lookups = countLookups();
+    const put = vi.spyOn(env.LINKS, "put");
+
+    const response = await submitStretchForm({ url: "https://example.org/kept", flavor: "jargon" });
+
+    expect(response.status).toBe(429);
+    const page = await response.text();
+    expect(page).toContain(
+      '<p class="field-error" id="url-error">That&#x27;s more than five links in a minute',
+    );
+    expect(page).toContain("Wait a minute, then stretch again.");
+    expect(page).toContain('value="https://example.org/kept"');
+    expect(page).toMatch(/<input type="radio" name="flavor" checked="" value="jargon"\/>/);
+    expect(page).not.toContain("Elongation report");
+    expect(lookups.count).toBe(0);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("keys the limit on the CF-Connecting-IP header", async () => {
+    const keys = useFakeLimiter(true);
+
+    await submitStretchForm({ url: "https://example.org/", flavor: "ooo" }, "203.0.113.9");
+
+    expect(keys).toEqual(["203.0.113.9"]);
+  });
+
+  it("uses one fixed key for requests without the header", async () => {
+    const keys = useFakeLimiter(true);
+
+    await submitStretchForm({ url: "https://example.org/", flavor: "ooo" }, null);
+    await submitStretchForm({ url: "https://example.org/", flavor: "ooo" }, null);
+
+    expect(keys).toEqual(["unknown", "unknown"]);
+  });
+
+  it("doesn't count a submission that could never create a link", async () => {
+    const keys = useFakeLimiter(true);
+
+    await submitStretchForm({ url: "not a url", flavor: "ooo" });
+    await submitStretchForm({ url: "http://192.0.2.7/", flavor: "ooo" });
+    await submitStretchForm({ url: "https://example.org/", flavor: "brevity" });
+
+    expect(keys).toEqual([]);
+  });
+
+  it("limits one client to five links a minute with the real binding", async () => {
+    const client = `limited-${crypto.randomUUID()}`;
+    // The binding's window is aligned to the clock, so a new minute can start partway through.
+    // Eleven requests can't all fit in two windows of five, whenever the window turns.
+    const responses = await Promise.all(
+      Array.from({ length: 11 }, () =>
+        submitStretchForm({ url: "https://example.org/", flavor: "ooo" }, client),
+      ),
+    );
+    const statuses = responses.map((response) => response.status);
+    await Promise.all(responses.map((response) => response.text()));
+
+    const created = statuses.filter((status) => status === 200).length;
+    expect(created).toBeGreaterThanOrEqual(5);
+    expect(created).toBeLessThanOrEqual(10);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(11 - created);
+  });
+
+  it("gives each client its own allowance with the real binding", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        submitStretchForm({ url: "https://example.org/", flavor: "ooo" }),
+      ),
+    );
+    const statuses = responses.map((response) => response.status);
+    await Promise.all(responses.map((response) => response.text()));
+
+    expect(statuses).toEqual(Array.from({ length: 8 }, () => 200));
   });
 });
 

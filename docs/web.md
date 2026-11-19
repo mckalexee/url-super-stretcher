@@ -63,9 +63,10 @@ private site without one.
 ### The public list
 
 `PUBLIC_PATHS` in `src/web/root.tsx` lists the route patterns that anyone may see on a private
-site, written the way React Router reports them, such as `/` or `/blog/:slug`. Every other route
-needs an identity, so a new route stays private until you add it to the list. The template lists
-only `/`.
+site, written the way React Router reports them: `/` for the index route, and the path from
+`src/web/routes.ts` without a leading slash for any other, such as `blog/:slug`. Every other route
+needs an identity, so a new route stays private until you add it to the list. The list holds `/`
+and `to/*`, the page of a stretched link.
 
 ### Where the identity comes from
 
@@ -148,6 +149,15 @@ cache write.
 
 A route that throws `data({ message }, { status })` gets that message on the error page from the
 root `ErrorBoundary`. Any other error renders a generic message.
+
+A loader that needs the address of the page reads the `url` argument, not `request.url`. On the
+data request that React Router makes for a client-side navigation, the path in `request.url` ends
+in `.data`.
+
+To send headers with a page, return `data(value, { headers })` from the loader and export a
+`headers` function that returns `loaderHeaders`, as `src/web/routes/to.tsx` does. For a thrown
+response, only the root route's `headers` export runs, and it passes the thrown headers through.
+An error that isn't a thrown response, which renders as a 500, gets none of them.
 
 ## Errors and logging
 

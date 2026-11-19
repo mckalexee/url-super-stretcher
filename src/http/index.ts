@@ -10,7 +10,6 @@ import { handleError } from "#http/errors.ts";
 import { logRequests } from "#http/logging.ts";
 import { apiRoutes } from "#http/routes/api.ts";
 import { healthRoutes } from "#http/routes/health.ts";
-import { linkRoutes } from "#http/routes/links.ts";
 import { cloudflareContext, identityResolverContext } from "#web/context.ts";
 
 const handleWebRequest = createRequestHandler(
@@ -39,7 +38,6 @@ export function createApp() {
 
   app.route("/", healthRoutes);
   app.route("/api", apiRoutes);
-  app.route("/", linkRoutes);
 
   // The catch-all is registered last so that every Hono route matches before React Router.
   app.all("*", (c) => {

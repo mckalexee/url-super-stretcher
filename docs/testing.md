@@ -101,6 +101,29 @@ it("reads the upstream value", async () => {
 });
 ```
 
+## Stretch and view links
+
+Creating a link and viewing one both ask the DNS resolver behind the reputation check, so a test
+file that does either calls `useResolver()` from `test/helpers/reputation.ts` in place of
+`useNetwork()`. It enables the mocked network and answers every lookup as a clean name. For
+another answer, add a handler in the test:
+
+- `resolver("malware.example")` blocks the hostnames that you pass, and no others.
+- `unreachableResolver` fails every lookup, the way an outage does.
+
+`submitStretchForm()` from `test/helpers/stretch.ts` posts the home page's form. Each call sends
+a new `CF-Connecting-IP` address, so the creation rate limit never rejects a test that isn't
+about it. Pass the same address as the second argument to several calls to share one allowance.
+
+The rate limiting binding in the test runtime counts for real, in windows aligned to the clock,
+so a test can't make a chosen request the one that goes over the limit. To test the 429 response,
+replace `env.CREATE_LIMITER` with a fake and restore it after the test, as
+`test/web/home.test.ts` does.
+
+`src/stretch/records.ts` and `src/stretch/takedown.ts` hold the pure parts of the takedown
+command, because every test runs in workerd and none runs in Node.js. `scripts/takedown.ts`
+itself has no tests. Try it with `--local` against the storage that `pnpm dev` uses.
+
 ## Test Cloudflare Access
 
 `createAccessIssuer()` from `test/helpers/access.ts` creates a fake Access issuer with its own

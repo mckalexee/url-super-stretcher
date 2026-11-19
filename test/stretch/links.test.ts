@@ -1,12 +1,15 @@
 // Tests for link storage and target validation: the round trip from `createLink` to `findLink`
-// in real KV, the lookups that must miss, and every input that `parseTarget` rejects.
+// in real KV, the lookups that must miss, the links that `resolveLink` reports as removed, and
+// every input that `parseTarget` rejects.
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import { HttpError } from "#lib/errors.ts";
 import { FLAVORS } from "#stretch/flavors.ts";
 import type { RandomSource } from "#stretch/flavors.ts";
-import { createLink, findLink, LINK_PREFIX, parseTarget } from "#stretch/links.ts";
+import { createLink, findLink, isHostBlocked, parseTarget, resolveLink } from "#stretch/links.ts";
+import { LINK_PREFIX } from "#stretch/prefix.ts";
+import { blockedHostKey, disableRecord } from "#stretch/records.ts";
 
 const OWN_HOSTNAME = "stretch.example.com";
 const TARGET = new URL("https://example.com/some/page?q=1#part");
@@ -187,6 +190,56 @@ describe("findLink", () => {
   });
 });
 
+describe("resolveLink", () => {
+  it("reports a stored link as active", async () => {
+    const link = await createLink(env.LINKS, TARGET, "jargon");
+
+    await expect(resolveLink(env.LINKS, link.path)).resolves.toEqual({ state: "active", link });
+  });
+
+  it("reports a path that was never stored as missing", async () => {
+    await expect(resolveLink(env.LINKS, "/to/never-stored")).resolves.toEqual({
+      state: "missing",
+    });
+  });
+
+  it("reports a disabled link as removed, and findLink still returns its record", async () => {
+    const link = await createLink(env.LINKS, TARGET, "ooo");
+    const disabled = disableRecord(link, new Date("2026-02-03T04:05:06.000Z"), "phishing");
+    await env.LINKS.put(await keyFor(link.path), JSON.stringify(disabled));
+
+    await expect(resolveLink(env.LINKS, link.path)).resolves.toEqual({ state: "removed" });
+    await expect(findLink(env.LINKS, link.path)).resolves.toEqual({
+      ...link,
+      disabledAt: "2026-02-03T04:05:06.000Z",
+      disabledReason: "phishing",
+    });
+  });
+
+  it("reports every link to a blocked hostname as removed", async () => {
+    const first = await createLink(env.LINKS, new URL("https://banned.example/a"), "ooo");
+    const second = await createLink(env.LINKS, new URL("https://Banned.Example./b"), "jargon");
+    const other = await createLink(env.LINKS, new URL("https://www.banned.example/"), "ooo");
+    await env.LINKS.put(blockedHostKey("banned.example"), "{}");
+
+    await expect(resolveLink(env.LINKS, first.path)).resolves.toEqual({ state: "removed" });
+    await expect(resolveLink(env.LINKS, second.path)).resolves.toEqual({ state: "removed" });
+    // The match is exact, so a subdomain needs its own key.
+    await expect(resolveLink(env.LINKS, other.path)).resolves.toMatchObject({ state: "active" });
+  });
+});
+
+describe("isHostBlocked", () => {
+  it("is true only for a hostname with a blocked-host key", async () => {
+    await env.LINKS.put("blocked-host:blocked.example", "{}");
+
+    await expect(isHostBlocked(env.LINKS, "blocked.example")).resolves.toBe(true);
+    await expect(isHostBlocked(env.LINKS, "BLOCKED.example.")).resolves.toBe(true);
+    await expect(isHostBlocked(env.LINKS, "sub.blocked.example")).resolves.toBe(false);
+    await expect(isHostBlocked(env.LINKS, "example.org")).resolves.toBe(false);
+  });
+});
+
 describe("parseTarget", () => {
   it("returns the parsed URL", () => {
     const url = parseTarget("https://example.com/a?b=c#d", OWN_HOSTNAME);
@@ -233,6 +286,19 @@ describe("parseTarget", () => {
     ["a URL on this site in another letter case", "https://STRETCH.Example.com/"],
     ["a URL on this site with a trailing dot", `https://${OWN_HOSTNAME}./`],
     ["a URL on this site with a port", `http://${OWN_HOSTNAME}:8080/`],
+    ["an IPv4 address", "http://192.0.2.7/admin"],
+    ["a scheme-less IPv4 address", "192.0.2.7/admin"],
+    ["a loopback address", "http://127.0.0.1:8080/"],
+    ["an IPv4 address written as one number", "http://2130706433/"],
+    ["an IPv4 address written in hexadecimal", "http://0x7f.0.0.1/"],
+    ["a bracketed IPv6 address", "http://[2001:db8::1]/"],
+    ["the IPv6 loopback address", "https://[::1]:8443/"],
+    ["localhost", "http://localhost:3000/"],
+    ["localhost with a trailing dot", "http://localhost./"],
+    ["a name under .localhost", "http://app.localhost/"],
+    ["a name under .local", "http://printer.local/"],
+    ["a name under .internal", "https://wiki.corp.internal/page"],
+    ["a private name in another letter case", "https://NAS.Local/"],
   ])("rejects %s with a 400", (_, input) => {
     const error = rejection(input);
 
@@ -263,6 +329,28 @@ describe("parseTarget", () => {
       "message",
       expect.stringContaining("this site"),
     );
+    expect(rejection("http://192.0.2.7/")).toHaveProperty(
+      "message",
+      expect.stringContaining("IP address"),
+    );
+    expect(rejection("http://[::1]/")).toHaveProperty(
+      "message",
+      expect.stringContaining("IP address"),
+    );
+    expect(rejection("http://printer.local/")).toHaveProperty(
+      "message",
+      expect.stringContaining("private network"),
+    );
+  });
+
+  it("accepts a public name that only resembles a private one", () => {
+    expect(parseTarget("https://local.example.com/", OWN_HOSTNAME).hostname).toBe(
+      "local.example.com",
+    );
+    expect(parseTarget("https://notlocalhost.example/", OWN_HOSTNAME).hostname).toBe(
+      "notlocalhost.example",
+    );
+    expect(parseTarget("https://1.2.3.example/", OWN_HOSTNAME).hostname).toBe("1.2.3.example");
   });
 
   it("keeps the rejected input out of the message", () => {

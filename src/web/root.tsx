@@ -12,8 +12,11 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useRouteLoaderData,
 } from "react-router";
 
+import { LINK_PREFIX } from "#stretch/prefix.ts";
+import { cloudflareContext } from "#web/context.ts";
 import { requireIdentityMiddleware } from "#web/middleware.ts";
 
 import type { Route } from "./+types/root.ts";
@@ -21,20 +24,41 @@ import type { Route } from "./+types/root.ts";
 import stylesheet from "./app.css?url";
 
 // Route patterns that anyone may see on a private site, written the way React Router reports
-// them, such as `/` or `/blog/:slug`. Every other route needs a Cloudflare Access identity, so a
-// new route stays private until you add it here.
-const PUBLIC_PATHS = new Set(["/"]);
+// them: `/` for the index route, and the path from `routes.ts` without a leading slash for any
+// other, such as `blog/:slug`. Every other route needs a Cloudflare Access identity, so a new
+// route stays private until you add it here.
+const PUBLIC_PATHS = new Set(["/", "to/*"]);
 
 /** Runs the identity gate for every route that isn't in the public list. */
 export const middleware: Route.MiddlewareFunction[] = [
   (args, next) => (PUBLIC_PATHS.has(args.pattern) ? next() : requireIdentityMiddleware(args, next)),
 ];
 
+/**
+ * Gives the footer the address that takes abuse reports. It comes from a var, so the address
+ * changes without a change to the code.
+ */
+export function loader({ context }: Route.LoaderArgs) {
+  return { abuseEmail: context.get(cloudflareContext).env.ABUSE_EMAIL };
+}
+
+/**
+ * Passes the headers of a thrown response to the error page. Only the root route's `headers`
+ * export runs when this route's error boundary renders, so without this a route that throws a
+ * response with `Cache-Control` would lose it.
+ */
+export function headers({ errorHeaders }: Route.HeadersArgs) {
+  return errorHeaders ?? {};
+}
+
 /** Loads the site's stylesheet on every page, including the error page. */
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
 /** Document shell shared by every route, including error boundaries. */
 export function Layout({ children }: { children: ReactNode }) {
+  // The loader doesn't run when the identity gate rejects the request or no route matches, and
+  // the footer then goes without the link.
+  const abuseEmail = useRouteLoaderData<typeof loader>("root")?.abuseEmail;
   return (
     <html lang="en">
       <head>
@@ -54,7 +78,15 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="tape tape-strip" aria-hidden="true" />
         {children}
         <footer className="site-footer">
-          <p>URL Super Stretcher is satire. The links work anyway.</p>
+          <p>
+            URL Super Stretcher is satire. The links work anyway.
+            {abuseEmail ? (
+              <>
+                {" "}
+                <a href={`mailto:${abuseEmail}`}>Report abuse</a>
+              </>
+            ) : null}
+          </p>
         </footer>
         <ScrollRestoration />
         <Scripts />
@@ -90,10 +122,6 @@ function messageFor(error: ErrorResponse): string {
   return STATUS_MESSAGES[error.status] ?? "The request failed.";
 }
 
-// Path prefix of every stretched link. It repeats `LINK_PREFIX` from `src/stretch/links.ts`
-// because importing that module here would ship the link store's code to the browser.
-const STRETCHED_LINK_PREFIX = "/to/";
-
 /**
  * Error page for every route. For a thrown response, it shows the status and the message that
  * the route supplied, or fixed text for the status. Anything else gets a generic message, so that
@@ -106,7 +134,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <main>
         <h1>{error.status}</h1>
         <p>{messageFor(error)}</p>
-        {error.status === 404 && pathname.startsWith(STRETCHED_LINK_PREFIX) ? (
+        {error.status === 404 && pathname.startsWith(LINK_PREFIX) ? (
           <p className="error-note">
             If this was a stretched link, some of it is missing. We recommend copying all of it.
           </p>

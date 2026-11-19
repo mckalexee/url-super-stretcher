@@ -19,6 +19,7 @@ pnpm test test/http/healthz.test.ts  # one test file
 pnpm fmt                             # fix formatting
 pnpm typegen                         # regenerate the generated types
 pnpm tail                            # stream the deployed Worker's live logs
+pnpm takedown '<long link URL>'      # disable a reported link, see docs/abuse.md
 ```
 
 - A change is done when `pnpm verify` passes. Run it before you report a change as finished.
@@ -61,7 +62,15 @@ module outside the current directory through its `#` subpath with the file exten
 
 - A stretched link's KV key is `link:` plus the SHA-256 of everything after `/to/` in its path
   and query, because a KV key is limited to 512 bytes and a link is longer. Never use the link
-  itself as a key.
+  itself as a key. `linkKey()` in `src/stretch/records.ts` is the one place that derives it.
+- A KV key `blocked-host:<hostname>` in the same namespace bans a hostname: lowercase, no
+  trailing dot, ASCII form. Only its existence matters. The match is exact, so it doesn't cover
+  subdomains.
+- A stretched link's page never redirects: no `Location` header, no meta refresh, no script. The
+  visitor follows a plain link.
+- `src/stretch/records.ts` and `src/stretch/takedown.ts` also run in Node.js, for
+  `scripts/takedown.ts`. Keep bindings and other Workers-only APIs and types out of them.
+- A failed reputation check lets a link through. Never turn a resolver outage into an error.
 
 - Identity goes through `src/http/access.ts`. `ctx.access` is absent behind the static assets
   router in production, so `access.ts` verifies the `Cf-Access-Jwt-Assertion` header itself.
@@ -81,5 +90,6 @@ Topic guides:
 
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.
+- [docs/abuse.md](docs/abuse.md): the abuse protections, takedowns, and hostname bans.
 
 - [docs/web.md](docs/web.md): the web app, identity, and the Cloudflare Access applications.
