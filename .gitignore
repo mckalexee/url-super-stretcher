@@ -22,3 +22,6 @@ coverage/
 
 # Operating system files
 .DS_Store
+
+# State that the taste skill writes when it arms its finish gate
+.taste-skill/
