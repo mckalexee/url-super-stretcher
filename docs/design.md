@@ -81,6 +81,33 @@ the length of the visitor's own link to its full length, and every figure counts
 Don't add a second animation. To change this one, capture frames across its whole duration and
 look at them. A screenshot of the last frame doesn't show motion.
 
+## Share images
+
+A social platform or a message app shows a card beside a shared link. `src/web/share.ts` writes
+the tags for the card, and the card's image is one of two files in `public/share`:
+
+- `home.jpg` goes with the home page.
+- `link.jpg` goes with every stretched link. The card's title names the destination's hostname,
+  and a blocked or removed link names nothing.
+
+Each image is a page in `design/share`, 1200 by 630 pixels, in the site's look. The text on each
+gold bar is real output of a finish. To change an image, edit its page, then render the page
+with Chrome and convert the result to JPEG. On macOS, from the repository root:
+
+```sh
+chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+"$chrome" --headless=new --hide-scrollbars --allow-file-access-from-files \
+  --window-size=1200,630 --virtual-time-budget=5000 \
+  --screenshot=home.png "file://$PWD/design/share/home.html"
+sips -s format jpeg -s formatOptions 80 home.png --out public/share/home.jpg
+```
+
+Platforms keep an image for a long time. To make them fetch a changed image, give the file a
+new name and update `SHARE_IMAGES` in `src/web/share.ts`.
+
+`public/robots.txt` keeps crawlers out of `/to/` and lets the preview fetchers of the large
+platforms in. Without that group, a shared stretched link shows no card.
+
 ## Check a change
 
 Look at the home page with each finish chosen, a result, and a link page at 320px and at 1280px

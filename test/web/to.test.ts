@@ -95,6 +95,18 @@ describe("GET /to/* for a stored link", () => {
     expect(page.split(`href="${inHtml(TARGET)}"`)).toHaveLength(2);
   });
 
+  it("describes the link for a share card, with the hostname and the image", async () => {
+    const link = await createLink(env.LINKS, new URL(TARGET), "jargon");
+
+    const page = await (await view(link.path)).text();
+
+    expect(page).toContain('<meta property="og:title" content="This link goes to example.org"/>');
+    expect(page).toContain(`<meta property="og:image" content="${ORIGIN}/share/link.jpg"/>`);
+    expect(page).toContain('<meta name="twitter:card" content="summary_large_image"/>');
+    // The address of a stretched link is too long to repeat in a tag.
+    expect(page).not.toContain("og:url");
+  });
+
   it("leaves the countdown to the script and sends no referrer with it", async () => {
     const link = await createLink(env.LINKS, new URL(TARGET), "jargon");
 
@@ -253,6 +265,8 @@ describe("GET /to/* for a destination on the security blocklist", () => {
     expect(page).toMatch(
       /<a href="mailto:abuse@jade\.email\?[^"]+">Report a problem with this link<\/a>/,
     );
+    // The share card of a blocked link names no destination.
+    expect(page).toContain('<meta property="og:title" content="Link blocked"/>');
   });
 
   it("checks on every view, so a link made earlier is blocked once its name is flagged", async () => {

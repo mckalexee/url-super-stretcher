@@ -11,6 +11,7 @@ import { resolveLink } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
+import { SHARE_IMAGES, shareMeta } from "#web/share.ts";
 
 import type { Route } from "./+types/to.ts";
 
@@ -57,7 +58,7 @@ export async function loader({ url, context }: Route.LoaderArgs) {
     throw data(null, { status: 404, statusText: "Not Found", headers: LINK_HEADERS });
   }
   if (lookup.state === "removed") {
-    return data({ state: "removed" as const }, { status: 410, headers: LINK_HEADERS });
+    return data({ state: "removed" as const, origin }, { status: 410, headers: LINK_HEADERS });
   }
 
   const longLink = origin + pathname + search;
@@ -68,7 +69,7 @@ export async function loader({ url, context }: Route.LoaderArgs) {
     // The hostname is safe to log, unlike the URL, whose query string can carry a token.
     log.info("stretch.view_blocked", { hostname });
     return data(
-      { state: "flagged" as const, hostname, report },
+      { state: "flagged" as const, origin, hostname, report },
       { status: 403, headers: LINK_HEADERS },
     );
   }
@@ -76,6 +77,7 @@ export async function loader({ url, context }: Route.LoaderArgs) {
   return data(
     {
       state: "active" as const,
+      origin,
       url: lookup.link.url,
       hostname,
       internationalized: isInternationalized(hostname),
@@ -91,17 +93,49 @@ export function headers({ loaderHeaders }: Route.HeadersArgs) {
   return loaderHeaders;
 }
 
-/** Page title for each state of a stretched link. */
+const numberFormat = new Intl.NumberFormat("en-US");
+
+/**
+ * Page title and share tags for each state of a stretched link. The share card of a working
+ * link names the destination's hostname, so a recipient sees where the link goes before they
+ * open it. The card of a blocked or removed link names nothing.
+ */
 export function meta({ loaderData }: Route.MetaArgs) {
   // A thrown 404 renders the error page with no loader data.
-  const state = (loaderData as Route.ComponentProps["loaderData"] | undefined)?.state;
-  if (state === "active") {
-    return [{ title: "Link destination" }];
+  const page = loaderData as Route.ComponentProps["loaderData"] | undefined;
+  if (page === undefined) {
+    return [{ title: "Link removed" }];
   }
-  return [{ title: state === "flagged" ? "Link blocked" : "Link removed" }];
+  const card = { origin: page.origin, image: SHARE_IMAGES.link };
+  if (page.state === "active") {
+    return [
+      { title: "Link destination" },
+      ...shareMeta({
+        ...card,
+        title: `This link goes to ${page.hostname}`,
+        description: `This link is ${numberFormat.format(page.length)} characters long.`,
+      }),
+    ];
+  }
+  if (page.state === "flagged") {
+    return [
+      { title: "Link blocked" },
+      ...shareMeta({
+        ...card,
+        title: "Link blocked",
+        description: "This link's destination is on a security blocklist.",
+      }),
+    ];
+  }
+  return [
+    { title: "Link removed" },
+    ...shareMeta({
+      ...card,
+      title: "Link removed",
+      description: "This link was removed after an abuse report.",
+    }),
+  ];
 }
-
-const numberFormat = new Intl.NumberFormat("en-US");
 
 // A long name wraps before a dot, so each line starts with a whole label and no label is cut in
 // two while there is room for it. `<wbr>` adds no character, so a copied name stays exact.
