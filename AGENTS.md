@@ -66,8 +66,10 @@ module outside the current directory through its `#` subpath with the file exten
 - A KV key `blocked-host:<hostname>` in the same namespace bans a hostname: lowercase, no
   trailing dot, ASCII form. Only its existence matters. The match is exact, so it doesn't cover
   subdomains.
-- A stretched link's page never redirects: no `Location` header, no meta refresh, no script. The
-  visitor follows a plain link.
+- The server never redirects a stretched link: no `Location` header and no meta refresh. The
+  page shows the destination first. Its script sends the visitor on after a 10-second countdown
+  that the visitor can stop, and never for an internationalized hostname, a blocked link, or a
+  removed one.
 - `src/stretch/records.ts` and `src/stretch/takedown.ts` also run in Node.js, for
   `scripts/takedown.ts`. Keep bindings and other Workers-only APIs and types out of them.
 - A failed reputation check lets a link through. Never turn a resolver outage into an error.

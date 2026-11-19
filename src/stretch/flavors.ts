@@ -266,6 +266,22 @@ const JARGON_CONNECTORS = [
   "in-lieu-of",
   "and-as-a-matter-of-priority",
   "and-from-thirty-thousand-feet",
+  "and-per-my-last-email",
+  "and-as-i-said-on-the-call",
+  "with-the-board-watching-closely",
+];
+
+// The opening names who is speaking, because the start of a link is the part that a recipient
+// sees. Each one ends in a word that a clause can follow.
+const JARGON_OPENERS = [
+  "from-the-desk-of-the-chief-executive-regarding",
+  "priority-briefing-from-the-executive-committee-on",
+  "as-raised-by-the-chairman-at-the-leadership-offsite-regarding",
+  "a-directive-from-the-office-of-the-managing-partner-concerning",
+  "memorandum-to-all-staff-from-senior-leadership-regarding",
+  "board-level-guidance-from-the-founder-on",
+  "remarks-of-the-managing-director-to-the-senior-leadership-team-on",
+  "an-update-from-the-executive-floor-regarding",
 ];
 
 const JARGON_CLOSERS = [
@@ -280,6 +296,7 @@ const JARGON_CLOSERS = [
 ];
 
 function jargon(id: Uint8Array, choices: Choices): string {
+  const opener = choices.pick(JARGON_OPENERS);
   const ending = [choices.pick(JARGON_CLOSERS), "tracked-as-action-item", toHex(id)].join("-");
   let text = "";
   for (;;) {
@@ -296,12 +313,12 @@ function jargon(id: Uint8Array, choices: Choices): string {
       clause.unshift(text, choices.pick(JARGON_CONNECTORS));
     }
     const longer = clause.join("-");
-    if (longer.length + 1 + ending.length > MAX_LENGTH) {
+    if (opener.length + 1 + longer.length + 1 + ending.length > MAX_LENGTH) {
       break;
     }
     text = longer;
   }
-  return `${text}-${ending}`;
+  return `${opener}-${text}-${ending}`;
 }
 
 // Legalese. One notice with a fixed skeleton: two recitals that define "the recipient" and "the
@@ -393,6 +410,8 @@ const LEGAL_FURTHER_COVENANTS = [
   "acknowledges-that-the-sender-may-seek-injunctive-relief-without-posting-bond",
   "stipulates-that-this-link-was-negotiated-at-arms-length",
   "confirms-that-no-reliance-has-been-placed-on-any-shorter-version-hereof",
+  "acknowledges-having-had-the-opportunity-to-seek-independent-advice-before-clicking",
+  "agrees-that-use-of-the-back-button-shall-not-constitute-rescission",
 ];
 
 const LEGAL_PROVISOS = [
@@ -401,9 +420,9 @@ const LEGAL_PROVISOS = [
   "any-provision-held-unenforceable-shall-be-severed-and-the-remainder-shall-continue-in-full-force-and-effect",
   "no-failure-or-delay-in-clicking-shall-operate-as-a-waiver-hereof",
   "the-headings-hereof-are-for-convenience-only-and-shall-not-affect-interpretation",
-  "words-in-the-singular-shall-include-the-plural-and-vice-versa",
+  "the-destination-is-furnished-as-is-without-warranty-of-any-kind-express-or-implied",
   "this-link-shall-be-governed-by-the-laws-of-the-jurisdiction-of-the-sender",
-  "the-foregoing-recitals-are-incorporated-herein-by-this-reference",
+  "no-event-of-force-majeure-shall-excuse-a-failure-to-click",
   "the-sender-shall-have-no-liability-howsoever-arising-in-connection-with-the-destination",
   "the-remedies-of-the-sender-shall-survive-the-closing-of-the-browser",
   "this-link-shall-inure-to-the-benefit-of-the-sender-and-its-successors",
@@ -423,6 +442,7 @@ const LEGAL_FURTHER_PROVISOS = [
   "the-rights-of-the-sender-hereunder-are-cumulative-and-not-exclusive",
   "the-obligations-of-the-recipient-shall-bind-all-successors-and-permitted-assigns",
   "the-sender-may-assign-this-link-without-the-consent-of-the-recipient",
+  "time-spent-reading-this-link-shall-not-toll-the-obligation-to-click",
 ];
 
 const LEGAL_ATTESTATIONS = [
@@ -515,10 +535,11 @@ function ooo(id: Uint8Array, choices: Choices): string {
   return `l${runs}ng`;
 }
 
-// Tracking. A landing page with every campaign parameter and every ad platform's click ID, then
-// parameters that tell the recipient how they rank, what is expected of them, and that the sender
-// is watching. The click IDs are random noise, as the real ones appear to be, and three long
-// marketing tokens take up whatever length is left.
+// Tracking. A landing page with every campaign parameter, then parameters that tell the recipient
+// how they rank, what is expected of them, and that the sender is watching, then every ad
+// platform's click ID. The assessment comes before the click IDs because the start of a link is
+// the part that a recipient reads. The click IDs are random noise, as the real ones appear to be,
+// and three marketing tokens take up whatever length is left.
 
 const TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -753,6 +774,22 @@ const TRACKING_REVIEWS = [
   "deferred",
 ];
 
+const TRACKING_COPIED = [
+  "human-resources",
+  "direct-supervisor",
+  "general-counsel",
+  "the-board",
+  "compliance",
+];
+
+const TRACKING_REMINDERS = ["first", "second", "third-and-final", "final-notice"];
+
+const TRACKING_UNOPENED = ["none-on-record", "one", "two", "several", "noted"];
+
+const TRACKING_PEERS = ["majority", "all-but-one", "all-senior-staff", "everyone-copied"];
+
+const TRACKING_TIMINGS = ["being-recorded", "benchmarked-against-peers", "to-be-discussed"];
+
 // The length of the whole text. The last three tokens are cut to fit, so this flavor always
 // comes out at exactly this length.
 const TRACKING_LENGTH = 1_900;
@@ -771,6 +808,27 @@ function tracking(id: Uint8Array, choices: Choices): string {
     ["utm_campaign", choices.pick(TRACKING_CAMPAIGNS)],
     ["utm_term", choices.pick(TRACKING_TERMS)],
     ["utm_content", choices.pick(TRACKING_CONTENTS)],
+    ["sender_rank", choices.pick(TRACKING_RANKS)],
+    ["recipient_tier", choices.pick(TRACKING_TIERS)],
+    ["account_standing", choices.pick(TRACKING_STANDINGS)],
+    ["cc", choices.pick(TRACKING_COPIED)],
+    ["reminder", choices.pick(TRACKING_REMINDERS)],
+    ["prior_links_unopened", choices.pick(TRACKING_UNOPENED)],
+    ["peers_already_opened", choices.pick(TRACKING_PEERS)],
+    ["time_to_open", choices.pick(TRACKING_TIMINGS)],
+    ["seniority_required", choices.pick(TRACKING_SENIORITIES)],
+    ["priority", choices.pick(TRACKING_PRIORITIES)],
+    ["clearance", choices.pick(TRACKING_CLEARANCES)],
+    ["attention_level", choices.pick(TRACKING_ATTENTIONS)],
+    ["response_expected", choices.pick(TRACKING_RESPONSES)],
+    ["open_window", choices.pick(TRACKING_WINDOWS)],
+    ["read_receipt", choices.pick(TRACKING_RECEIPTS)],
+    ["forwarding", choices.pick(TRACKING_FORWARDINGS)],
+    ["reply_to", choices.pick(TRACKING_REPLY_TOS)],
+    ["escalation_path", choices.pick(TRACKING_ESCALATIONS)],
+    ["engagement_score", choices.pick(TRACKING_ENGAGEMENTS)],
+    ["performance_review", choices.pick(TRACKING_REVIEWS)],
+    ["follow_up", choices.pick(TRACKING_FOLLOW_UPS)],
     ["fbclid", token(96)],
     ["gclid", token(88)],
     ["wbraid", token(60)],
@@ -785,24 +843,8 @@ function tracking(id: Uint8Array, choices: Choices): string {
     ["click_id", toHex(id)],
     ["session_id", token(40)],
     ["impression_id", token(32)],
-    ["sender_rank", choices.pick(TRACKING_RANKS)],
-    ["recipient_tier", choices.pick(TRACKING_TIERS)],
-    ["account_standing", choices.pick(TRACKING_STANDINGS)],
-    ["seniority_required", choices.pick(TRACKING_SENIORITIES)],
-    ["priority", choices.pick(TRACKING_PRIORITIES)],
-    ["clearance", choices.pick(TRACKING_CLEARANCES)],
-    ["attention_level", choices.pick(TRACKING_ATTENTIONS)],
-    ["response_expected", choices.pick(TRACKING_RESPONSES)],
-    ["open_window", choices.pick(TRACKING_WINDOWS)],
-    ["read_receipt", choices.pick(TRACKING_RECEIPTS)],
-    ["forwarding", choices.pick(TRACKING_FORWARDINGS)],
-    ["reply_to", choices.pick(TRACKING_REPLY_TOS)],
-    ["escalation_path", choices.pick(TRACKING_ESCALATIONS)],
-    ["engagement_score", choices.pick(TRACKING_ENGAGEMENTS)],
-    ["performance_review", choices.pick(TRACKING_REVIEWS)],
-    ["follow_up", choices.pick(TRACKING_FOLLOW_UPS)],
   ];
-  // Three long marketing tokens share the remaining length, so no single value dwarfs the rest.
+  // Three marketing tokens share the remaining length, so no single value dwarfs the rest.
   const fillers = ["mkt_tok", "_gl", "_hsenc"];
   const fixed = `landing?${parameters.map(([key, value]) => `${key}=${value}`).join("&")}`;
   const keys = fillers.reduce((total, key) => total + key.length + 2, 0);

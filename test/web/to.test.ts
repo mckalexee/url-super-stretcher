@@ -1,4 +1,4 @@
-// Tests for the page of a stretched link: it shows the destination and never redirects, it
+// Tests for the page of a stretched link: it shows the destination, the server never redirects, it
 // answers 404 for a path that isn't a stored link, 410 for a link that was taken down, and 403
 // for a destination on the security blocklist, and every answer tells caches and crawlers to
 // keep away.
@@ -93,6 +93,17 @@ describe("GET /to/* for a stored link", () => {
     );
     // The destination appears as a link once, and nowhere else as an address to load.
     expect(page.split(`href="${inHtml(TARGET)}"`)).toHaveLength(2);
+  });
+
+  it("leaves the countdown to the script and sends no referrer with it", async () => {
+    const link = await createLink(env.LINKS, new URL(TARGET), "jargon");
+
+    const response = await view(link.path);
+
+    // The script's navigation carries no `rel`, so the header keeps the long link from the
+    // destination.
+    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(await response.text()).not.toContain("Continuing in");
   });
 
   it("reports the length of the link that the visitor followed", async () => {

@@ -57,8 +57,9 @@ Some copy is there to inform or protect a visitor, and it's plain:
 
 - **Error messages** say what's wrong and how to fix it, and nothing else. For example: "Only
   http and https URLs are supported."
-- **The link page** tells the recipient where the link goes and warns them to check it. The one
-  line in voice is a plain statistic: "This link is 957 characters long."
+- **The link page** tells the recipient where the link goes and warns them to check it. The
+  countdown is plain too: "Continuing in 10 seconds." The one line in voice is a plain
+  statistic: "This link is 957 characters long."
 - **The removed page, the blocked page, and the 404 note** are plain.
 
 Plain copy can still be funny by itself. A link lengthener that answers "URLs longer than 2,048
@@ -81,13 +82,15 @@ characters aren't supported." needs no help.
 `src/stretch/flavors.ts` holds the word lists. The same man chose what the links say, and each
 finish has a job:
 
-- **Executive** is his own voice: real corporate jargon, closed by a phrase that pulls rank, such
-  as `as-approved-at-the-executive-level`.
+- **Executive** is his own voice: real corporate jargon that opens by naming who is speaking,
+  such as `from-the-desk-of-the-chief-executive-regarding`, and closes with a phrase that pulls
+  rank, such as `as-approved-at-the-executive-level`.
 - **Legal** is written to intimidate, in the register of a formal notice from a sender who
   expects to be obeyed. Real contract language is applied faithfully to the act of clicking a
   link: `the-recipient-hereby-waives-any-and-all-rights-to-a-shorter-link`.
 - **Fully loaded** tells the recipient that they are being assessed: `recipient_tier=under-review`,
-  `response_expected=before-close-of-business`.
+  `cc=human-resources`, `peers_already_opened=all-but-one`. The assessment comes before the click
+  IDs.
 - **Extended** is length and nothing else.
 
 The rules for the pages apply here too. A phrase can be absurd, but it can't be a gag, and the
@@ -96,7 +99,8 @@ stays, because it's a clause that he would want. `so-ordered-so-agreed-and-so-ve
 because it's the link nudging the reader.
 
 Every entry in a list has the same grammatical shape, so that any combination reads as a
-sentence.
+sentence. A recipient sees the start of a link and rarely the end, so each finish puts its
+point first.
 
 Each finish writes about 1,900 characters, so that a whole link comes to about 2,000. Executive
 adds clauses and Legal adds provisos until one more would pass the limit, so an entry longer than
