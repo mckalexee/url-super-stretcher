@@ -21,7 +21,6 @@
   --placeholder: #c2a557;
   --on-gold: #150d00;
   --engraved: #3a2500;
-  --unlit: #7a6730;
   --alert: #ff9d7e;
 
   --foil: linear-gradient(
@@ -631,6 +630,20 @@ main.home .flavors {
   align-items: start;
 }
 
+/* A result that arrives without a page load fades in. The script adds the class only to a result
+   that also types, and the switch stops the fade when the visitor pauses motion. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="on"] .result-arriving {
+    animation: result-arrive 250ms ease-out both;
+  }
+}
+
+@keyframes result-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
 .figure {
   margin: 28px 0 0;
 }
@@ -665,7 +678,8 @@ main.home .flavors {
 /*
  * The long link is shown whole and wraps anywhere, because its length is the point. It sits in
  * the same gold-ruled well as the field. One click or tap selects all of it, so copying works
- * without the script.
+ * without the script. A line breaks at the edge of the column, whichever characters are there,
+ * so the typing, which swaps characters, never moves a line break.
  */
 .long-link {
   padding: 22px;
@@ -679,19 +693,38 @@ main.home .flavors {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.7;
-  overflow-wrap: anywhere;
+  line-break: anywhere;
+  word-break: break-all;
   user-select: all;
   -webkit-user-select: all;
 }
 
-/* While the link lights, the part still to come is dim and the lit end glows. */
-.long-link-unlit {
-  color: var(--unlit);
-}
-
+/* While the link types, the typing position glows, the visitor's link that it hasn't reached yet
+   is dim, and the rest of the long link waits in its place without showing. */
 .long-link-edge {
   color: #fff;
   text-shadow: 0 0 10px #ffcf4d;
+}
+
+.long-link-old {
+  color: var(--placeholder);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.long-link-pending {
+  color: transparent;
+}
+
+/* The part of the long link that the visitor's link still covers. It takes no room and shows
+   nothing, and assistive technology still reads it. */
+.long-link-unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .report {

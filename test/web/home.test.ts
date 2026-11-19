@@ -159,6 +159,21 @@ describe("POST /", () => {
     expect(page).toContain('<th scope="row">Destination</th><td>Unchanged</td>');
   });
 
+  it("renders the result at rest, with the whole long link as plain text", async () => {
+    const target = "https://example.org/a?b=1";
+    const response = await submitStretchForm({ url: target, flavor: "ooo" });
+
+    const page = await response.text();
+    const longLink = longLinkIn(page);
+    const format = new Intl.NumberFormat("en-US");
+    expect(page).toContain(`<td>${format.format(longLink.length)}<!-- --> characters</td>`);
+    // One text node and no markup for the typing: no span, and nothing of the visitor's link.
+    const escaped = longLink.replaceAll("&", "&amp;");
+    expect(page).toContain(`<p class="long-link" data-testid="long-link">${escaped}</p>`);
+    expect(page).toContain('<section class="result" aria-labelledby="result-heading">');
+    expect(page).not.toContain("long-link-");
+  });
+
   it("adds https to a bare hostname", async () => {
     const response = await submitStretchForm({ url: "example.org", flavor: "jargon" });
 

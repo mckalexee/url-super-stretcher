@@ -77,16 +77,18 @@ The marble is `src/web/marble.svg`, which draws gold veins with turbulence filte
 The home page has no motion. A choice of finish swaps the gold bar at once, and nothing
 transitions on hover.
 
-The site has one animation, on a result. When a result arrives, the finished link lights from
-the length of the visitor's own link to its full length, and every figure counts with it.
-`useLighting` in `src/web/routes/home.tsx` runs it.
+When a result arrives without a page load, it fades in, and the long link is typed over the
+visitor's own link, one character at a time from the left. The typing starts slow and speeds up,
+on the curve in `src/web/typing.ts`, and every figure counts with it. `useTyping` in
+`src/web/routes/home.tsx` runs it.
 
-- The whole link is laid out from the first frame, so nothing moves while it lights.
+- The whole link is laid out from the first frame, and it breaks lines at any character, so
+  nothing moves while it types.
 - One clock drives the link and the figures, so they agree in every frame.
-- It doesn't run for a visitor who prefers reduced motion, or without the script.
+- It runs only while the motion switch in `src/web/motion.ts` allows motion, so it doesn't run
+  without the script, for a visitor who prefers reduced motion, or on a paused page.
 
-Don't add a second animation. To change this one, capture frames across its whole duration and
-look at them. A screenshot of the last frame doesn't show motion.
+To change it, capture frames across its whole duration and look at them. A screenshot of the last frame doesn't show motion.
 
 ## Share images
 

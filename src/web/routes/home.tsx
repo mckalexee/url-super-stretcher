@@ -12,7 +12,9 @@ import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
 import { Marble } from "#web/marble.tsx";
+import { useMotionAllowed } from "#web/motion.ts";
 import { SHARE_IMAGES, shareMeta } from "#web/share.ts";
+import { typedShare } from "#web/typing.ts";
 
 import type { Route } from "./+types/home.ts";
 
@@ -32,7 +34,7 @@ export interface StretchStatistics {
 }
 
 // Takes lengths, not strings, so that the result view can also measure a link that is only
-// partly lit while its animation runs.
+// partly typed while its animation runs.
 function measure(originalLength: number, stretchedLength: number): StretchStatistics {
   const gained = stretchedLength - originalLength;
   return {
@@ -165,7 +167,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     originalLength: statistics.originalLength,
     stretchedLength: statistics.stretchedLength,
   });
-  return { ok: true as const, longLink, flavor: link.flavor, statistics };
+  return { ok: true as const, longLink, original: link.url, flavor: link.flavor, statistics };
 }
 
 const DESCRIPTION = "Make your links appear longer and more intimidating.";
@@ -226,64 +228,104 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// How long the link takes to light, in milliseconds.
-const LIGHTING_MS = 2600;
-// The number of characters at the lit end of the link that take the accent color.
+// How long the result takes to fade in, in milliseconds. It matches the `result-arrive`
+// animation in the stylesheet. The typing waits for it, so the first characters arrive on a
+// result that the visitor can already see.
+const FADE_MS = 250;
+// How long the long link takes to type over the visitor's link, in milliseconds, after the fade.
+// At this length, a link of 1,900 characters types its first dozen in about 0.4 seconds, slow
+// enough to read them one by one, and the curve's fast end types its last thousand in about
+// half a second, so the end never seems to stall.
+const TYPING_MS = 4000;
+// The number of characters at the typing position that take the accent color.
 const LEADING_EDGE = 10;
 
-// Slow at both ends and fast between them.
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-}
-
-// A constant speed mixed with the eased one, so the first characters light slowly enough to
-// read and the lighting never appears to stall.
-function progress(t: number): number {
-  return 0.35 * t + 0.65 * easeInOutCubic(t);
-}
-
 /**
- * Runs the one animation on the site: the finished link lights from the length of the visitor's
- * own link to its full length. Returns how many characters are lit, or `null` when the link is
- * at rest. A result that arrives without a page load animates. A result that the server
- * rendered is at rest, and so is every result for a visitor who prefers reduced motion.
+ * Runs the result's typing: the long link is typed over the visitor's own link, one character at
+ * a time from the left. Returns how many characters are typed, or `null` when the link is at
+ * rest. A result that arrives without a page load types, while the motion switch allows motion.
+ * A result that the server rendered is at rest. A pause in the middle sends the link to rest
+ * for good, so a later resume doesn't type it again.
  */
-function useLighting(originalLength: number, stretchedLength: number): number | null {
-  // True only for a component that first renders in the browser, after hydration. Deciding
-  // here, and not in an effect, makes the first painted frame the starting one.
-  const mountedInBrowser = useHydrated();
-  const from = Math.min(originalLength, stretchedLength);
-  const [animated] = useState(
-    () => mountedInBrowser && !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  const [lit, setLit] = useState<number | null>(animated ? from : null);
+function useTyping(stretchedLength: number): number | null {
+  const motion = useMotionAllowed();
+  // The switch is off on the server and during hydration, so only a result that first renders
+  // in the browser can start typing. Deciding here, and not in an effect, makes the first
+  // painted frame the starting one.
+  const [running, setRunning] = useState(motion);
+  const [typed, setTyped] = useState(0);
+  if (running && !motion) {
+    setRunning(false);
+  }
 
   useEffect(() => {
-    if (!animated) {
+    if (!running) {
       return undefined;
     }
     const stop = new AbortController();
-    const span = stretchedLength - from;
     const start = performance.now();
     const tick = (now: number) => {
       if (stop.signal.aborted) {
         return;
       }
-      const t = Math.min(1, (now - start) / LIGHTING_MS);
-      if (t === 1) {
-        setLit(null);
+      const t = (now - start - FADE_MS) / TYPING_MS;
+      if (t >= 1) {
+        setRunning(false);
         return;
       }
-      setLit(Math.round(from + span * progress(t)));
+      setTyped(Math.floor(stretchedLength * typedShare(t)));
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
     return () => stop.abort();
-  }, [animated, from, stretchedLength]);
-  return lit;
+  }, [running, stretchedLength]);
+  return running ? typed : null;
 }
 
-function Result({ longLink, statistics }: { longLink: string; statistics: StretchStatistics }) {
+// The link in the well while it's typed. Every frame holds as many characters as the long link,
+// in one monospace face, and the stylesheet breaks lines at any character, so each line break
+// stays where it is at rest and the well never changes size.
+function TypedLink({
+  longLink,
+  original,
+  typed,
+}: {
+  longLink: string;
+  original: string;
+  typed: number;
+}) {
+  const edge = Math.min(LEADING_EDGE, typed);
+  const covered = Math.max(typed, original.length);
+  return (
+    <>
+      {longLink.slice(0, typed - edge)}
+      <span className="long-link-edge">{longLink.slice(typed - edge, typed)}</span>
+      {typed < original.length ? (
+        <>
+          {/* Assistive technology reads the long link whole in every frame. The part of it that
+              the visitor's link still covers is read from here, and the visitor's link is
+              hidden from it. */}
+          <span className="long-link-unseen">{longLink.slice(typed, original.length)}</span>
+          <span className="long-link-old" aria-hidden="true">
+            {original.slice(typed)}
+          </span>
+        </>
+      ) : null}
+      {/* Laid out but invisible, so the well has its final size from the first frame. */}
+      <span className="long-link-pending">{longLink.slice(covered)}</span>
+    </>
+  );
+}
+
+function Result({
+  longLink,
+  original,
+  statistics,
+}: {
+  longLink: string;
+  original: string;
+  statistics: StretchStatistics;
+}) {
   const heading = useRef<HTMLHeadingElement>(null);
   // An enhanced submission doesn't load a new page, so focus moves to the result to tell
   // keyboard and screen reader users that it arrived. The page gives each result a new key, so
@@ -292,14 +334,23 @@ function Result({ longLink, statistics }: { longLink: string; statistics: Stretc
     heading.current?.focus({ preventScroll: true });
   }, []);
 
-  const lit = useLighting(statistics.originalLength, statistics.stretchedLength);
-  // While the link lights, every figure describes the lit part, so the text and the numbers
-  // agree in every frame.
-  const shown = lit === null ? statistics : measure(statistics.originalLength, lit);
-  const edge = lit === null ? 0 : Math.min(LEADING_EDGE, lit);
+  const typed = useTyping(statistics.stretchedLength);
+  // The first render decides the fade, as it decides the typing. The stylesheet runs the fade
+  // only while the motion switch is on, so a pause stops it too.
+  const [arriving] = useState(typed !== null);
+  // While the link types, every figure describes the link in the well, so the text and the
+  // numbers agree in every frame. Until the typing passes the end of the visitor's link, the
+  // well holds a link as long as the visitor's, which shows no growth.
+  const shown =
+    typed === null
+      ? statistics
+      : measure(statistics.originalLength, Math.max(typed, statistics.originalLength));
 
   return (
-    <section className="result" aria-labelledby="result-heading">
+    <section
+      className={arriving ? "result result-arriving" : "result"}
+      aria-labelledby="result-heading"
+    >
       <div>
         <h1 id="result-heading" ref={heading} tabIndex={-1}>
           Your link is ready
@@ -346,17 +397,12 @@ function Result({ longLink, statistics }: { longLink: string; statistics: Stretc
           </tbody>
         </table>
       </div>
-      {/* The whole link is in the page in every frame, so nothing moves while it lights and a
-          copy made mid-animation is still complete. */}
+      {/* At rest, the paragraph holds the long link as one text node. */}
       <p className="long-link" data-testid="long-link">
-        {lit === null ? (
+        {typed === null ? (
           longLink
         ) : (
-          <>
-            {longLink.slice(0, lit - edge)}
-            <span className="long-link-edge">{longLink.slice(lit - edge, lit)}</span>
-            <span className="long-link-unlit">{longLink.slice(lit)}</span>
-          </>
+          <TypedLink longLink={longLink} original={original} typed={typed} />
         )}
       </p>
     </section>
@@ -387,7 +433,14 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   return (
     <main className={result ? undefined : "home"}>
       {result ? (
-        <Result key={result.longLink} longLink={result.longLink} statistics={result.statistics} />
+        <Result
+          // Each stretched link gets a new result, which types again. The prefix keeps this key
+          // apart from the form's, because the two are siblings.
+          key={`result:${result.longLink}`}
+          longLink={result.longLink}
+          original={result.original}
+          statistics={result.statistics}
+        />
       ) : (
         <>
           {/* A picture of the product, with one bar for each finish. The stylesheet shows the
@@ -414,7 +467,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
       <Form
         method="post"
         className={result ? "stretch-form again" : "stretch-form"}
-        key={result?.longLink ?? "first"}
+        key={result ? `form:${result.longLink}` : "form"}
       >
         {result ? <h2>Stretch another link</h2> : null}
         <fieldset
