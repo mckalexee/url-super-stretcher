@@ -790,6 +790,45 @@ const TRACKING_PEERS = ["majority", "all-but-one", "all-senior-staff", "everyone
 
 const TRACKING_TIMINGS = ["being-recorded", "benchmarked-against-peers", "to-be-discussed"];
 
+// Real tracking terms, with values about the recipient.
+const TRACKING_SEGMENTS = [
+  "slow-responders",
+  "needs-follow-up",
+  "second-attempt",
+  "under-observation",
+  "junior-staff",
+];
+
+const TRACKING_LEAD_SCORES = ["declining", "low", "under-review", "below-threshold"];
+
+const TRACKING_ATTRIBUTIONS = ["by-name", "individual", "named-recipient"];
+
+const TRACKING_OPEN_RATES = ["100-percent", "no-exceptions", "full-compliance"];
+
+const TRACKING_OPT_OUTS = ["unavailable", "not-offered", "withdrawn", "by-written-request"];
+
+const TRACKING_RETENTIONS = ["indefinite", "permanent", "seven-years", "until-further-notice"];
+
+const TRACKING_PEER_RANKINGS = ["below-median", "bottom-quartile", "unranked", "under-review"];
+
+const TRACKING_HISTORIES = ["slower-than-peers", "inconsistent", "on-file", "under-review"];
+
+const TRACKING_NON_RESPONSES = [
+  "noted-in-file",
+  "raised-at-review",
+  "reported-upward",
+  "escalated",
+];
+
+const TRACKING_DELEGATIONS = ["not-permitted", "with-approval", "logged", "discouraged"];
+
+const TRACKING_VIEWERS = ["senior-leadership", "all-partners", "the-committee", "the-sender-only"];
+
+const TRACKING_HOLDS = ["placed", "pending", "accepted-on-behalf-of-recipient"];
+
+// The hour at which the sender was at work, on a 24-hour clock.
+const TRACKING_SENT_TIMES = ["0447", "0512", "sunday-2130"];
+
 // The length of the whole text. The last three tokens are cut to fit, so this flavor always
 // comes out at exactly this length.
 const TRACKING_LENGTH = 1_900;
@@ -808,10 +847,18 @@ function tracking(id: Uint8Array, choices: Choices): string {
     ["utm_campaign", choices.pick(TRACKING_CAMPAIGNS)],
     ["utm_term", choices.pick(TRACKING_TERMS)],
     ["utm_content", choices.pick(TRACKING_CONTENTS)],
+    ["audience_segment", choices.pick(TRACKING_SEGMENTS)],
+    ["lead_score", choices.pick(TRACKING_LEAD_SCORES)],
+    ["attribution", choices.pick(TRACKING_ATTRIBUTIONS)],
+    ["target_open_rate", choices.pick(TRACKING_OPEN_RATES)],
     ["sender_rank", choices.pick(TRACKING_RANKS)],
+    ["sent_at", choices.pick(TRACKING_SENT_TIMES)],
     ["recipient_tier", choices.pick(TRACKING_TIERS)],
     ["account_standing", choices.pick(TRACKING_STANDINGS)],
+    ["peer_ranking", choices.pick(TRACKING_PEER_RANKINGS)],
+    ["response_history", choices.pick(TRACKING_HISTORIES)],
     ["cc", choices.pick(TRACKING_COPIED)],
+    ["visible_to", choices.pick(TRACKING_VIEWERS)],
     ["reminder", choices.pick(TRACKING_REMINDERS)],
     ["prior_links_unopened", choices.pick(TRACKING_UNOPENED)],
     ["peers_already_opened", choices.pick(TRACKING_PEERS)],
@@ -824,18 +871,23 @@ function tracking(id: Uint8Array, choices: Choices): string {
     ["open_window", choices.pick(TRACKING_WINDOWS)],
     ["read_receipt", choices.pick(TRACKING_RECEIPTS)],
     ["forwarding", choices.pick(TRACKING_FORWARDINGS)],
+    ["delegation", choices.pick(TRACKING_DELEGATIONS)],
+    ["opt_out", choices.pick(TRACKING_OPT_OUTS)],
     ["reply_to", choices.pick(TRACKING_REPLY_TOS)],
     ["escalation_path", choices.pick(TRACKING_ESCALATIONS)],
+    ["non_response", choices.pick(TRACKING_NON_RESPONSES)],
     ["engagement_score", choices.pick(TRACKING_ENGAGEMENTS)],
     ["performance_review", choices.pick(TRACKING_REVIEWS)],
     ["follow_up", choices.pick(TRACKING_FOLLOW_UPS)],
-    ["fbclid", token(96)],
-    ["gclid", token(88)],
-    ["wbraid", token(60)],
-    ["gbraid", token(60)],
-    ["dclid", token(64)],
+    ["calendar_hold", choices.pick(TRACKING_HOLDS)],
+    ["retention", choices.pick(TRACKING_RETENTIONS)],
+    ["fbclid", token(48)],
+    ["gclid", token(44)],
+    ["wbraid", token(30)],
+    ["gbraid", token(30)],
+    ["dclid", token(32)],
     ["msclkid", token(32)],
-    ["ttclid", token(64)],
+    ["ttclid", token(32)],
     ["twclid", token(40)],
     ["li_fat_id", token(36)],
     ["igshid", token(24)],
