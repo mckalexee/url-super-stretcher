@@ -1062,6 +1062,199 @@ dd {
   }
 }
 
+/* The coil */
+
+/*
+ * The transition after a stretch from the home page, which src/web/coil.ts plays: the long link
+ * types over the visitor's link, runs out of the field, and coils around the page, and then the
+ * result takes the home page's place and the link flies into the well. Every rule here needs a
+ * class that the script adds while the coil plays and takes away when it ends, so a page without
+ * the coil is styled as if this section weren't here.
+ */
+.coil-running {
+  /* The fade of everything that the coil runs over. */
+  --coil-fade: 300ms;
+  /* How far everything that the coil runs over steps back, and how far the marble and the gold
+     bar do. The link is then the brightest thing on the page. */
+  --coil-dim: 0.08;
+  --coil-stage-dim: 0.4;
+}
+
+/*
+ * Making room. The coil's inner lanes cross the content, so when the head leaves the field,
+ * everything on the home page fades except the link itself, which is drawn in the overlay. The
+ * band fades whole, with the field's box and the button in it, because the dark outline of the
+ * coil's letters looks dirty on a gold border or on polished gold. Only `opacity` changes.
+ * Everything that fades has its compositor layer from the start of the coil, so the browser
+ * doesn't make and paint six layers in the frame where the fade starts.
+ */
+.coil-running .site-header,
+.coil-running .site-footer,
+.coil-running .home .stage,
+.coil-running .home .hero,
+.coil-running .home .flavors,
+.coil-running .home .go {
+  transition: opacity var(--coil-fade) ease;
+  will-change: opacity;
+}
+
+.coil-dim .site-header,
+.coil-dim .site-footer,
+.coil-dimmed .hero,
+.coil-dimmed .flavors,
+.coil-dimmed .go {
+  opacity: var(--coil-dim);
+}
+
+.coil-dimmed .stage {
+  opacity: var(--coil-stage-dim);
+}
+
+/* While the home page fades out over the result, it keeps its place and takes no space, so the
+   result is laid out where it will stay. */
+.home.coil-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/*
+ * The finale is set up while the finished coil holds still, and the page is then already as tall
+ * as the result. Until the motion starts, the page's frame and the footer stay where the home page
+ * had them, at the window's edge, so nothing is seen to change.
+ */
+body.coil-held::before {
+  bottom: auto;
+  height: calc(100vh - 24px);
+}
+
+.coil-held .site-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/*
+ * The result during the finale. A page is its own stacking context, so the rows that fly into the
+ * well are inside the result: over its background and the well, and under its heading, figures,
+ * buttons, and table. The result can't fade in as one layer with the rows in it, so its parts fade
+ * together, and its background is drawn by an element of its own under everything, with the
+ * values that the script copies from the result.
+ */
+main.coil-arriving {
+  background: none;
+}
+
+/* The moving marble waits until the link has landed, so its WebGL setup isn't in the finale's
+   frames. It fades in over the still marble afterward, as it does on any result. */
+.coil-arriving > .marble-water {
+  display: none;
+}
+
+.coil-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  max-width: none;
+  pointer-events: none;
+}
+
+.coil-arriving .result > div {
+  position: relative;
+  z-index: 2;
+}
+
+/* The result's parts get their compositor layers while the finished coil holds still, and the
+   browser paints them then, so that work isn't in the frame where the fade starts. */
+.coil-fading > .coil-backdrop,
+.coil-fading > form,
+.coil-fading .result > * {
+  will-change: opacity;
+}
+
+/*
+ * The coil is drawn in one SVG that covers the window, over the page and its frame. It has its own
+ * compositor layer, so a new piece of text repaints a small part of this layer and nothing of the
+ * blurred, masked gold bar under it.
+ */
+.coil-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.coil-overlay text {
+  fill: var(--bright);
+}
+
+/* A dark outline under each letter, so the text reads over the gold bar and over another lane's
+   letters at a corner. Text inside the field goes without it, because the outline would cut into
+   the letters that the visitor's link still shows there. */
+.coil-overlay .coil-halo {
+  paint-order: stroke;
+  stroke: var(--black);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* The newest letters, in the colors of `.long-link-edge`. They're a separate element, so the glow
+   filter covers a few letters and not the window. */
+.coil-overlay .coil-edge {
+  fill: #fff;
+  filter: drop-shadow(0 0 5px #ffcf4d);
+}
+
+/* The well holds the whole link from the first frame, unseen, so it never changes size. Its own
+   text shows when the last row has landed on it. */
+.long-link.coil-waiting {
+  color: transparent;
+}
+
+/*
+ * The rows in flight. Each is a line of text that sits exactly on its place in the well, in the
+ * well's font, which the script copies to this element, and a transform carries it there from the
+ * coil. The element covers the result and clips its lines, so a turning line never gives the page
+ * a scroll bar.
+ */
+.coil-flyers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--bright);
+}
+
+/* A line in flight has the same dark outline as the text on the coil, so it reads over the
+   marble. The outline is the color of the well. Each line has its compositor layer from the
+   moment it's made, while the finished coil holds still, so the browser doesn't make and paint
+   every layer in the frame where the flights start. A line that has landed gives its layer up and
+   drops its outline, so it's drawn exactly as the well's own text will be, and it's drawn over
+   the lines still in flight, so a passing line and its outline never cut into text at rest. */
+.coil-flyer {
+  position: absolute;
+  white-space: pre;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 4px var(--well);
+  will-change: transform, opacity;
+}
+
+.coil-flyer.coil-landed {
+  z-index: 1;
+  paint-order: normal;
+  -webkit-text-stroke: 0;
+  will-change: auto;
+}
+
 /* The shine */
 
 /*

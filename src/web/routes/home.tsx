@@ -1,7 +1,8 @@
 // Home page, which is the whole product: a form that takes a URL and a flavor, the action that
 // stores the stretched link, and the result view that shows the long link with its statistics.
 // The form posts to this route's own action, so it works without JavaScript.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { data, Form, useNavigation } from "react-router";
 
 import { HttpError } from "#lib/errors.ts";
@@ -9,6 +10,7 @@ import { log } from "#lib/log.ts";
 import { FLAVORS, generateStretch, isFlavorId, type RandomSource } from "#stretch/flavors.ts";
 import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
+import { type CoilRun, startCoil } from "#web/coil.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
 import { Marble } from "#web/marble.tsx";
@@ -243,16 +245,17 @@ const LEADING_EDGE = 10;
 /**
  * Runs the result's typing: the long link is typed over the visitor's own link, one character at
  * a time from the left. Returns how many characters are typed, or `null` when the link is at
- * rest. A result that arrives without a page load types, while the motion switch allows motion.
- * A result that the server rendered is at rest. A pause in the middle sends the link to rest
- * for good, so a later resume doesn't type it again.
+ * rest. A result that arrives without a page load types, while the motion switch allows motion,
+ * unless `atRest` says that it arrived some other way. A result that the server rendered is at
+ * rest. A pause in the middle sends the link to rest for good, so a later resume doesn't type it
+ * again.
  */
-function useTyping(stretchedLength: number): number | null {
+function useTyping(stretchedLength: number, atRest: boolean): number | null {
   const motion = useMotionAllowed();
   // The switch is off on the server and during hydration, so only a result that first renders
   // in the browser can start typing. Deciding here, and not in an effect, makes the first
   // painted frame the starting one.
-  const [running, setRunning] = useState(motion);
+  const [running, setRunning] = useState(motion && !atRest);
   const [typed, setTyped] = useState(0);
   if (running && !motion) {
     setRunning(false);
@@ -317,14 +320,34 @@ function TypedLink({
   );
 }
 
+// The text of the figures that the coil counts while the rows land, for a link of a given
+// length, formatted as the result formats them.
+function countedFigures(
+  originalLength: number,
+  length: number,
+): readonly [string, string, string, string] {
+  const shown = measure(originalLength, length);
+  return [
+    `${numberFormat.format(shown.growthPercent)}%`,
+    `${numberFormat.format(shown.stretchedLength)} characters`,
+    numberFormat.format(shown.gained),
+    numberFormat.format(shown.posts),
+  ];
+}
+
+// `atRest` is for a result that the coil brought in: it's mounted once the coil has written the
+// link, so it neither fades in nor types. The first render reads it, and a later change does
+// nothing.
 function Result({
   longLink,
   original,
   statistics,
+  atRest,
 }: {
   longLink: string;
   original: string;
   statistics: StretchStatistics;
+  atRest: boolean;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   // An enhanced submission doesn't load a new page, so focus moves to the result to tell
@@ -334,7 +357,7 @@ function Result({
     heading.current?.focus({ preventScroll: true });
   }, []);
 
-  const typed = useTyping(statistics.stretchedLength);
+  const typed = useTyping(statistics.stretchedLength, atRest);
   // The first render decides the fade, as it decides the typing. The stylesheet runs the fade
   // only while the motion switch is on, so a pause stops it too.
   const [arriving] = useState(typed !== null);
@@ -409,17 +432,56 @@ function Result({
   );
 }
 
+type ActionData = Route.ComponentProps["actionData"];
+type StretchResult = Extract<NonNullable<ActionData>, { ok: true }>;
+type Rejection = Extract<NonNullable<ActionData>, { ok: false }>;
+
+// A coil in progress. `before` is the action's answer that the home page showed when the visitor
+// submitted, so the home page stays exactly as it was while the coil runs over it. The phase is
+// `deciding` for the one render before the coil starts or the page gives it up, `writing` while
+// the link coils, and `landing` once the result is mounted for the finale.
+interface CoilState {
+  before: ActionData;
+  phase: "deciding" | "writing" | "landing";
+}
+
 /** Home page body: the result of the last stretch, when there is one, and the form. */
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation();
   const stretching = navigation.state === "submitting";
-  const result = actionData?.ok ? actionData : null;
-  const rejection = actionData && !actionData.ok ? actionData : null;
+  const motion = useMotionAllowed();
+
+  // The action's answer that the page last saw. A new one is the moment to decide on the coil,
+  // and deciding during the render, not in an effect, keeps the result off the screen until the
+  // decision is made. A result that the server rendered is the first answer seen, so it never
+  // coils.
+  const [seen, setSeen] = useState(actionData);
+  const [coil, setCoil] = useState<CoilState | null>(null);
+  // The long link of a result that has to arrive at rest, because the coil brought it in or was
+  // stopped on its way.
+  const [restingLink, setRestingLink] = useState<string | null>(null);
+  if (actionData !== seen) {
+    setSeen(actionData);
+    // Only a stretch from the home page's form coils. The form under a result has no field on
+    // the coil's line.
+    const fromHome = !(seen?.ok ?? false);
+    setCoil(actionData?.ok && fromHome && motion ? { before: seen, phase: "deciding" } : null);
+  }
+
+  const result: StretchResult | null = actionData?.ok ? actionData : null;
+  // While the coil plays, the home page shows the answer from before the submission.
+  const homeData = coil === null ? actionData : coil.before;
+  const rejection: Rejection | null = homeData && !homeData.ok ? homeData : null;
   const urlError = rejection?.field === "url" ? rejection.message : null;
   const flavorError = rejection?.field === "flavor" ? rejection.message : null;
-  const chosenFlavor = loaderData.flavors.some((flavor) => flavor.id === rejection?.values.flavor)
-    ? rejection?.values.flavor
-    : (result?.flavor ?? loaderData.flavors[0]?.id);
+  // A rejection belongs to the home page's form, and the form under a result starts from the
+  // result's finish.
+  const flavorFor = (shown: StretchResult | null) => {
+    const rejected = shown ? undefined : rejection?.values.flavor;
+    return loaderData.flavors.some((flavor) => flavor.id === rejected)
+      ? rejected
+      : (shown?.flavor ?? loaderData.flavors[0]?.id);
+  };
 
   const urlInput = useRef<HTMLInputElement>(null);
   // After an enhanced submission is rejected, focus returns to the field, where the message is.
@@ -430,49 +492,84 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
     }
   }, [rejection]);
 
-  return (
-    <main className={result ? undefined : "home"}>
-      {result ? (
-        <Result
-          // Each stretched link gets a new result, which types again. The prefix keeps this key
-          // apart from the form's, because the two are siblings.
-          key={`result:${result.longLink}`}
-          longLink={result.longLink}
-          original={result.original}
-          statistics={result.statistics}
-        />
-      ) : (
-        <>
-          {/* A picture of the product, with one bar for each finish. The stylesheet shows the
-              bar of the chosen finish. */}
-          <div className="stage" aria-hidden="true">
-            {loaderData.flavors.map((flavor) => (
-              <div className="rig" data-flavor={flavor.id} key={flavor.id}>
-                <div className="bar-shadow" />
-                <div className="bar bar-sharp">{flavor.sample}</div>
-                <div className="bar bar-soft">{flavor.sample}</div>
-              </div>
-            ))}
-            {/* Last, because the stylesheet picks the first bar as the first child. */}
-            <Marble />
-          </div>
-          <div className="hero">
-            <h1>Your link is too short</h1>
-            <p className="lede">Make your links appear longer and more intimidating.</p>
-          </div>
-        </>
-      )}
+  const homeMain = useRef<HTMLElement>(null);
+  const resultMain = useRef<HTMLElement>(null);
+  const run = useRef<CoilRun | null>(null);
+  const longLink = result?.longLink;
+  const originalLength = result?.statistics.originalLength;
+  // The coil's steps run in layout effects, so each one is done before the browser paints: the
+  // decision, before the first frame of the new result, and the finale's setup, before the first
+  // frame of the mounted result.
+  useLayoutEffect(() => {
+    if (coil === null) {
+      // Whatever ended the coil, nothing of it outlives it.
+      run.current?.cancel();
+      run.current = null;
+      return;
+    }
+    if (longLink === undefined || originalLength === undefined) {
+      return;
+    }
+    // The page shows the result at rest synchronously, so the frame after the coil's last one
+    // already has it.
+    const rest = () => {
+      run.current = null;
+      flushSync(() => {
+        setRestingLink(longLink);
+        setCoil(null);
+      });
+    };
+    if (coil.phase === "deciding") {
+      const home = homeMain.current;
+      const field = home?.querySelector<HTMLInputElement>(".field-input");
+      run.current =
+        home && field
+          ? startCoil({
+              home,
+              field,
+              longLink,
+              originalLength,
+              figures: (length) => countedFigures(originalLength, length),
+              onComplete: () => setCoil((current) => current && { ...current, phase: "landing" }),
+              onLanded: rest,
+              onDropped: rest,
+            })
+          : null;
+      setCoil(run.current === null ? null : { ...coil, phase: "writing" });
+    } else if (coil.phase === "landing") {
+      const landed = resultMain.current !== null && run.current?.land(resultMain.current);
+      if (!landed) {
+        run.current = null;
+        setRestingLink(longLink);
+        setCoil(null);
+      }
+    }
+  }, [coil, longLink, originalLength]);
+  // A page that leaves mid-coil takes the coil with it.
+  useLayoutEffect(
+    () => () => {
+      run.current?.cancel();
+      run.current = null;
+    },
+    [],
+  );
 
-      {/* A new key after each success clears the field, so the next link starts from empty. */}
+  // The home page's form keeps its key while the coil plays, so the field keeps the visitor's
+  // link for the coil to overwrite, and its button keeps the label it had at the submission. The
+  // result's form is new for each result, which clears its field.
+  const renderForm = (shown: StretchResult | null) => {
+    const frozen = shown === null && coil !== null;
+    const busy = stretching || frozen;
+    return (
       <Form
         method="post"
-        className={result ? "stretch-form again" : "stretch-form"}
-        key={result ? `form:${result.longLink}` : "form"}
+        className={shown ? "stretch-form again" : "stretch-form"}
+        key={shown ? `form:${shown.longLink}` : "form"}
       >
-        {result ? <h2>Stretch another link</h2> : null}
+        {shown ? <h2>Stretch another link</h2> : null}
         <fieldset
           className="flavors"
-          aria-describedby={flavorError === null ? undefined : "flavor-error"}
+          aria-describedby={flavorError === null || shown ? undefined : "flavor-error"}
         >
           <legend>Finish</legend>
           <div className="flavor-list">
@@ -482,14 +579,14 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   type="radio"
                   name="flavor"
                   value={flavor.id}
-                  defaultChecked={flavor.id === chosenFlavor}
+                  defaultChecked={flavor.id === flavorFor(shown)}
                 />
                 <span className="flavor-name">{flavor.name}</span>
                 <span className="flavor-description">{flavor.description}</span>
               </label>
             ))}
           </div>
-          {flavorError === null ? null : (
+          {flavorError === null || shown ? null : (
             <p className="field-error" id="flavor-error">
               {flavorError}
             </p>
@@ -501,7 +598,9 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             Your link
           </label>
           <input
-            ref={urlInput}
+            // The form that leaves with the coil gives the ref up, so the ref always points at
+            // the form that stays.
+            ref={frozen ? undefined : urlInput}
             className="field-input"
             id="url"
             name="url"
@@ -513,22 +612,76 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             autoCapitalize="none"
             spellCheck={false}
             placeholder="https://example.com"
-            defaultValue={rejection?.values.url ?? ""}
-            aria-invalid={urlError === null ? undefined : true}
-            aria-describedby={urlError === null ? undefined : "url-error"}
+            defaultValue={shown ? "" : (rejection?.values.url ?? "")}
+            aria-invalid={urlError === null || shown ? undefined : true}
+            aria-describedby={urlError === null || shown ? undefined : "url-error"}
           />
-          <button type="submit" className="button button-solid" disabled={stretching}>
-            {stretching ? "Stretching" : "Stretch link"}
+          <button type="submit" className="button button-solid" disabled={busy}>
+            {busy ? "Stretching" : "Stretch link"}
           </button>
-          {urlError === null ? null : (
+          {urlError === null || shown ? null : (
             <p className="field-error" id="url-error">
               {urlError}
             </p>
           )}
         </div>
       </Form>
-      {/* A result is on the marble that every page has. The form page's marble is the stage's. */}
-      {result ? <Marble /> : null}
+    );
+  };
+
+  // The home page and the result are separate `main` elements with their own keys. For most of
+  // the coil the page is the home page alone, and in the finale the result follows it, so that
+  // the home page can fade out over the result while each keeps its elements.
+  const homeView = (
+    <main key="home" ref={homeMain} className="home" inert={coil !== null}>
+      {/* A picture of the product, with one bar for each finish. The stylesheet shows the bar
+          of the chosen finish. */}
+      <div className="stage" aria-hidden="true">
+        {loaderData.flavors.map((flavor) => (
+          <div className="rig" data-flavor={flavor.id} key={flavor.id}>
+            <div className="bar-shadow" />
+            <div className="bar bar-sharp">{flavor.sample}</div>
+            <div className="bar bar-soft">{flavor.sample}</div>
+          </div>
+        ))}
+        {/* Last, because the stylesheet picks the first bar as the first child. */}
+        <Marble />
+      </div>
+      <div className="hero">
+        <h1>Your link is too short</h1>
+        <p className="lede">Make your links appear longer and more intimidating.</p>
+      </div>
+      {renderForm(null)}
     </main>
+  );
+  const resultView =
+    result === null ? null : (
+      <main key="result" ref={resultMain}>
+        <Result
+          // Each stretched link gets a new result, which types again. The prefix keeps this key
+          // apart from the form's, because the two are siblings.
+          key={`result:${result.longLink}`}
+          longLink={result.longLink}
+          original={result.original}
+          statistics={result.statistics}
+          atRest={coil !== null || restingLink === result.longLink}
+        />
+        {renderForm(result)}
+        {/* A result is on the marble that every page has. The form page's marble is the
+            stage's. */}
+        <Marble />
+      </main>
+    );
+
+  if (coil === null) {
+    return resultView ?? homeView;
+  }
+  return coil.phase === "landing" ? (
+    <>
+      {homeView}
+      {resultView}
+    </>
+  ) : (
+    homeView
   );
 }
