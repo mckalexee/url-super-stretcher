@@ -1,15 +1,16 @@
-// Page for a stretched link. It shows where the link leads and leaves the decision to continue
-// to the visitor, because a public redirector that forwards without a pause is a tool for
-// phishing. The page never redirects by itself. It also carries the other protections: a link
-// that was taken down gets a removal notice, and a destination on a security blocklist gets a
-// blocked page without a link.
-import { Fragment } from "react";
+// Page for a stretched link. It shows where the link leads before the visitor gets there, because
+// a public redirector that forwards without a pause is a tool for phishing. The server never
+// redirects. The page's script counts down and then sends the visitor on, and the visitor can
+// stop it. The page also carries the other protections: a link that was taken down gets a removal
+// notice, and a destination on a security blocklist gets a blocked page without a link.
+import { Fragment, useEffect, useState } from "react";
 import { data } from "react-router";
 
 import { log } from "#lib/log.ts";
 import { resolveLink } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
+import { useHydrated } from "#web/hydrated.ts";
 
 import type { Route } from "./+types/to.ts";
 
@@ -121,6 +122,58 @@ function Hostname({ name }: { name: string }) {
   );
 }
 
+// How long the page shows the destination before it sends the visitor on. It's long enough to
+// read a hostname and a URL.
+const CONTINUE_AFTER_SECONDS = 10;
+
+// A visitor who came back from the destination wants this page, not the destination again.
+function arrivedByHistory(): boolean {
+  const [entry] = performance.getEntriesByType("navigation");
+  return entry instanceof PerformanceNavigationTiming && entry.type === "back_forward";
+}
+
+// Mounts only in the browser, so its first render can read `window`.
+function RunningCountdown({ url }: { url: string }) {
+  // `null` means that the countdown isn't running: the visitor stopped it or came back.
+  const [remaining, setRemaining] = useState<number | null>(() =>
+    arrivedByHistory() ? null : CONTINUE_AFTER_SECONDS,
+  );
+
+  useEffect(() => {
+    if (remaining === null) {
+      return undefined;
+    }
+    if (remaining === 0) {
+      // The site's `Referrer-Policy` is `no-referrer`, so the destination doesn't learn the
+      // long link, the same as with the Continue link.
+      window.location.assign(url);
+      return undefined;
+    }
+    const timer = setTimeout(() => setRemaining(remaining - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [remaining, url]);
+
+  if (remaining === null) {
+    return null;
+  }
+  return (
+    <p className="countdown">
+      {remaining === 1 ? "Continuing in 1 second." : `Continuing in ${remaining} seconds.`}{" "}
+      <button type="button" className="link-button" onClick={() => setRemaining(null)}>
+        Stay on this page
+      </button>
+    </p>
+  );
+}
+
+/**
+ * Sends the visitor to the destination after a countdown that they can stop. It needs the
+ * script, so a visitor without JavaScript stays on the page and follows the link.
+ */
+function Countdown({ url }: { url: string }) {
+  return useHydrated() ? <RunningCountdown url={url} /> : null;
+}
+
 /** Page body: the destination and the way on, or the reason that there isn't one. */
 export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) {
   if (loaderData.state === "removed") {
@@ -174,6 +227,8 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
         </a>
         <a href={loaderData.report}>Report this link</a>
       </div>
+      {/* A name that can imitate another site gets no countdown. The visitor has to choose. */}
+      {loaderData.internationalized ? null : <Countdown url={loaderData.url} />}
       <p className="journey">
         This link is {numberFormat.format(loaderData.length)} characters long.
       </p>

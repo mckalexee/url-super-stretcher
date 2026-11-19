@@ -17,7 +17,8 @@ without JavaScript. Cloudflare Access identity reaches loaders and API routes.
 
 **Stretched links.** `src/stretch` writes the long links and stores them in the `LINKS` KV
 namespace. `GET /to/*` renders a page that shows where a stored link leads, and the visitor
-chooses whether to continue. The page never redirects.
+can continue or stay. The page's script continues after a 10-second countdown that the visitor
+can stop. The server never redirects.
 
 **Abuse protections.** A reputation check against Cloudflare's malware-blocking DNS resolver, a
 rate limit on new links, a takedown command, and a report link on every page.

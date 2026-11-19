@@ -1,7 +1,7 @@
 // Home page, which is the whole product: a form that takes a URL and a flavor, the action that
 // stores the stretched link, and the result view that shows the long link with its statistics.
 // The form posts to this route's own action, so it works without JavaScript.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { data, Form, useNavigation } from "react-router";
 
 import { HttpError } from "#lib/errors.ts";
@@ -10,6 +10,7 @@ import { FLAVORS, generateStretch, isFlavorId, type RandomSource } from "#stretc
 import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
+import { useHydrated } from "#web/hydrated.ts";
 
 import type { Route } from "./+types/home.ts";
 
@@ -181,18 +182,6 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return minutes === 0 ? `${rest} s` : `${numberFormat.format(minutes)} min ${rest} s`;
-}
-
-const subscribeToNothing = () => () => {};
-
-// False on the server and during hydration, then true. Controls that need the script render only
-// when this is true, so a visitor without JavaScript never sees a button that does nothing.
-function useHydrated(): boolean {
-  return useSyncExternalStore(
-    subscribeToNothing,
-    () => true,
-    () => false,
-  );
 }
 
 function CopyButton({ text }: { text: string }) {

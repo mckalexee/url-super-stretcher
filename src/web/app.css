@@ -709,6 +709,24 @@ main > p.destination-host {
   margin-top: 20px;
 }
 
+.countdown {
+  margin-top: 20px;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A button that reads as a link, for an action that isn't the main one. */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .journey {
   max-width: 832px;
   margin-top: 44px;
