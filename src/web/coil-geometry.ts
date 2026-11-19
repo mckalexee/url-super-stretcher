@@ -177,8 +177,9 @@ export function coilPath({
  * of `fieldRun`, steps down to the coil's size before the line's first corner, and stays at that
  * size to the end of the line. The result is the number of characters in the field, the sizes of
  * the taper, the number of characters at each size of the taper, and the `capacity` of the whole
- * line in characters. `advance` is the width of a character as a share of the font size, which
- * is one number for a fixed-width face.
+ * line in characters. When one character of each size of the taper doesn't fit between the field
+ * and the first corner, the run and the capacity are zero. `advance` is the width of a character
+ * as a share of the font size, which is one number for a fixed-width face.
  */
 export function coilZones({
   pathLength,
@@ -209,7 +210,12 @@ export function coilZones({
   }
   // One character of each size, end to end. The taper has to end before the first corner.
   const onePass = taper.reduce((sum, size) => sum + size * advance, 0);
-  const run = Math.max(1, Math.min(taperRun, Math.floor((lead - fieldLength) / onePass)));
+  const run = Math.min(taperRun, Math.floor((lead - fieldLength) / onePass));
+  // Text that jumped from the field's size to the coil's would read as a mistake, so a line
+  // without room for one pass of the taper holds nothing, and `fitCoil()` gives up on it.
+  if (!(run >= 1)) {
+    return { fieldCount, taper, run: 0, capacity: 0 };
+  }
   const rest = pathLength - fieldLength - run * onePass;
   const capacity = fieldCount + run * taper.length + Math.floor(rest / (coilSize * advance) + 1e-6);
   return { fieldCount, taper, run, capacity };
@@ -218,12 +224,13 @@ export function coilZones({
 /**
  * Fits the coil to a window, so the whole link is written on it. Returns the number of laps, the
  * font size, the pitch between lanes, the pitch beside the field, and the insets of the outermost
- * lane, or `null` when the most laps at the smallest size can't hold the link. It chooses the
- * fewest laps that hold the link at the smallest size or larger, and then the largest size at
- * which the link still fits, so the last character lands near the end of the last lap. The pitch
- * follows the size and the length of the line follows the pitch, so the size is found by halving
- * a range. When the largest size holds the link with room to spare, the text ends before the line
- * does. The text is never larger than the field's, because the taper runs down from it.
+ * lane, or `null` when the most laps at the smallest size can't hold the link, which includes a
+ * line with no room for the taper before its first corner. It chooses the fewest laps that hold
+ * the link at the smallest size or larger, and then the largest size at which the link still
+ * fits, so the last character lands near the end of the last lap. The pitch follows the size and
+ * the length of the line follows the pitch, so the size is found by halving a range. When the
+ * largest size holds the link with room to spare, the text ends before the line does. The text is
+ * never larger than the field's, because the taper runs down from it.
  *
  * `depth` is how far in from the outermost lane a lane may be at the bottom and on the left,
  * where it passes the start of the field's text. When the lanes don't fit in it at their own

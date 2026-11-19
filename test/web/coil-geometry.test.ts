@@ -167,6 +167,22 @@ describe("coilZones", () => {
     expect(narrow.run).toBe(1);
   });
 
+  it("holds nothing when the taper doesn't fit before the first corner", () => {
+    // The field's text ends 24px before the corner, and one pass of the taper takes 36px.
+    const short = coilZones({
+      pathLength: 10_000,
+      lead: 1020,
+      advance: 0.6,
+      fieldRun: 1000,
+      fieldSize: 20,
+      coilSize: 10,
+      taperSteps: 5,
+      taperRun: 3,
+    });
+    expect(short.run).toBe(0);
+    expect(short.capacity).toBe(0);
+  });
+
   it("counts every character that the line holds", () => {
     const rest = 10_000 - 83 * 12 - 3 * 36;
     expect(zones.capacity).toBe(83 + 3 * 4 + Math.floor(rest / 6));
@@ -211,6 +227,26 @@ describe("fitCoil", () => {
 
   it("gives up when the field leaves no room for the lanes", () => {
     expect(fitCoil({ ...FIT, characters: 1960, depth: 8 })).toBeNull();
+  });
+
+  it("gives up when the run to the first corner is shorter than one pass of the taper", () => {
+    // The field's text ends about 54px before the first corner, and one pass of the taper takes
+    // more than 95px at every size.
+    expect(fitCoil({ ...FIT, characters: 300, fieldRun: 1240 })).toBeNull();
+  });
+
+  it("gives up in a window of no size", () => {
+    expect(
+      fitCoil({
+        ...FIT,
+        width: 0,
+        height: 0,
+        start: { x: 0, y: 0 },
+        fieldRun: 0,
+        depth: 0,
+        characters: 300,
+      }),
+    ).toBeNull();
   });
 });
 

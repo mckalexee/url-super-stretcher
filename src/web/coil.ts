@@ -73,6 +73,12 @@ const TAPER_RUN = 3;
 
 // The coil needs the wide layout, where the field and the button share a row.
 const WIDE = "(min-width: 900px)";
+// The overwrite in the field takes one character for one cell of the fixed-width face, which
+// holds only for printable ASCII. A link with anything else types in the result's well instead.
+const PRINTABLE_ASCII = /^[\x20-\x7e]*$/;
+// How long the live region stays empty before it gets its word. A screen reader announces a
+// change to a live region, and not the text that the region has when it appears.
+const ANNOUNCE_DELAY_MS = 150;
 
 const SVG = "http://www.w3.org/2000/svg";
 const PATH_ID = "coil-path";
@@ -93,6 +99,11 @@ export interface CoilOptions {
    */
   figures: (length: number) => readonly [string, string, string, string];
   /**
+   * The word that screen readers announce while the coil plays, which is the word that the
+   * button shows while a stretch is pending.
+   */
+  announcement: string;
+  /**
    * Called when the coil is complete. The page then mounts the result after the home page, and
    * calls `land()` with it before the browser paints.
    */
@@ -103,8 +114,9 @@ export interface CoilOptions {
    */
   onLanded: () => void;
   /**
-   * Called when the coil stops early: on a pause, a hidden tab, a resize, or a failure. Every
-   * trace of the coil is gone, and the page shows the result at rest synchronously.
+   * Called when the coil stops early: on a pause, a hidden tab, a resize, a key or pointer press
+   * that skips it, or a failure. Every trace of the coil is gone, and the page shows the result
+   * at rest synchronously.
    */
   onDropped: () => void;
 }
@@ -499,16 +511,24 @@ function countFigures(result: HTMLElement, format: CoilOptions["figures"]) {
 }
 
 /**
- * Starts the coil, or returns `null`, with nothing changed, when it can't play here: in a window
- * narrower than the wide layout, on a home page taller than the window, with a link that doesn't
- * fit on the coil, before the fixed-width face has loaded, in a browser that lacks an API that
- * the coil uses, or on any failure. The page then shows the result without the coil. Call it
- * before the browser paints the page that has the new result, so the first frame shows the home
- * page as the visitor left it.
+ * Starts the coil, or returns `null`, with nothing changed, when it can't play here: in a hidden
+ * tab, in a window narrower than the wide layout, on a home page taller than the window, with a
+ * visitor's link that has characters outside printable ASCII, with a long link that doesn't fit
+ * on the coil, before the fixed-width face has loaded, in a browser that lacks an API that the
+ * coil uses, or on any failure. The page then shows the result without the coil. Call it before
+ * the browser paints the page that has the new result, so the first frame shows the home page as
+ * the visitor left it.
+ *
+ * Any key or pointer press while the coil plays skips it, and the page shows the result at rest.
  */
 export function startCoil(options: CoilOptions): CoilRun | null {
   const { home, field, longLink } = options;
-  if (!supported() || !window.matchMedia(WIDE).matches) {
+  // A hidden tab paints no frames and sends no `visibilitychange` until the visitor comes back,
+  // so a coil started there would play in full on their return.
+  if (document.hidden || !supported() || !window.matchMedia(WIDE).matches) {
+    return null;
+  }
+  if (!PRINTABLE_ASCII.test(field.value)) {
     return null;
   }
   const root = document.documentElement;
@@ -543,6 +563,12 @@ export function startCoil(options: CoilOptions): CoilRun | null {
   let over = false;
   const visitorLink = field.value;
   const homeStyled = home.hasAttribute("style");
+  // The coil hides the page from assistive technology, so a live region outside the inert home
+  // page says what's happening. It's added only once the coil is sure to play.
+  const status = document.createElement("div");
+  status.className = "coil-status";
+  status.setAttribute("role", "status");
+  let announceTimer: ReturnType<typeof setTimeout> | null = null;
 
   const onVisibilityChange = () => {
     if (document.hidden) {
@@ -550,6 +576,28 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     }
   };
   const onResize = () => drop();
+  // Any press skips the coil, and the result appears at rest under the pointer and the focus in
+  // the same event, so the press mustn't also act on the result. The default action of a pointer
+  // press would move the focus off the result's heading. The pointer is captured by the body
+  // until it's released, so the browser sends the press's click to the body, not to a button or
+  // a link of the result that's now under the pointer.
+  const onPointerDown = (event: PointerEvent) => {
+    event.preventDefault();
+    try {
+      document.body.setPointerCapture(event.pointerId);
+    } catch {
+      // A pointer that's no longer pressed can't be captured, and it sends no click either.
+    }
+    drop();
+  };
+  // The default action of a key would act on the focus, which is about to be the result's
+  // heading. A key with a modifier is left alone, because it's a shortcut of the browser.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+    }
+    drop();
+  };
 
   // Removes every trace of the run. The result's own text goes back first, while its element is
   // still in the page.
@@ -560,7 +608,14 @@ export function startCoil(options: CoilOptions): CoilRun | null {
       frameRequest = 0;
     }
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("pointerdown", onPointerDown, true);
+    window.removeEventListener("keydown", onKeyDown, true);
     document.removeEventListener("visibilitychange", onVisibilityChange);
+    if (announceTimer !== null) {
+      clearTimeout(announceTimer);
+      announceTimer = null;
+    }
+    status.remove();
     stopWatching?.();
     stopWatching = null;
     finale?.clear();
@@ -631,6 +686,9 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     // doesn't make and paint six layers in the frame where the fade starts.
     document.body.classList.add("coil-running");
     window.addEventListener("resize", onResize);
+    // In the capture phase, so the coil sees a press before anything on the page acts on it.
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
     document.addEventListener("visibilitychange", onVisibilityChange);
     // The first answer comes at once, while the page is still deciding, and the page then
     // shows the result itself.
@@ -651,6 +709,11 @@ export function startCoil(options: CoilOptions): CoilRun | null {
       clear();
       return null;
     }
+    document.body.appendChild(status);
+    announceTimer = setTimeout(() => {
+      announceTimer = null;
+      status.textContent = options.announcement;
+    }, ANNOUNCE_DELAY_MS);
   } catch {
     clear();
     return null;

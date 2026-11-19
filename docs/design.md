@@ -144,12 +144,11 @@ After a stretch without a page load, the long link arrives in one of two ways.
 `src/web/routes/home.tsx` decides which.
 
 - **The coil.** From the home page's form, on a window at least 900px wide that holds the whole
-  home page without scrolling, the long link types
-  over the visitor's link in the field, runs out of the field, and coils around the inside of the
-  page's gold frame. The result then takes the home page's place, and the link flies into the
-  result's box row by row. `src/web/coil.ts` draws it, `src/web/coil-geometry.ts` holds its
-  arithmetic, and the section "The coil" in `app.css` styles it. The owner approved the
-  prototype, `design/motion/coil.html`.
+  home page without scrolling, the long link types over the visitor's link in the field, runs out
+  of the field, and coils around the inside of the page's gold frame. The result then takes the
+  home page's place, and the link flies into the result's box row by row. `src/web/coil.ts` draws
+  it, `src/web/coil-geometry.ts` holds its arithmetic, and the section "The coil" in `app.css`
+  styles it. The owner approved the prototype, `design/motion/coil.html`.
 - **The typing.** When the coil doesn't play, for example on a narrow window, from the form under
   a result, or when the link doesn't fit the coil, the result fades in and the long link types over
   the visitor's link in the result's box. `useTyping` in `home.tsx` runs it.
@@ -159,7 +158,8 @@ laid out from the first frame and breaks lines at any character, so nothing shif
 types, and one clock drives the link and the figures, so they agree in every frame. The coil's
 timing and sizes are constants at the top of `coil.ts`, and the fades are custom properties in
 "The coil". A pause in the middle sends the link to rest for good. The coil also drops to the
-result at rest on a hidden tab, a resize, or a failure.
+result at rest on a hidden tab, a resize, or a failure, and any key or pointer press skips it.
+While the coil plays, a live region announces the button's pending label to screen readers.
 
 ### Change the motion
 

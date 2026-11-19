@@ -1258,6 +1258,20 @@ main.coil-arriving {
   will-change: auto;
 }
 
+/* The live region that speaks for the page while the coil hides it from assistive technology.
+   It's read, not seen, like `.long-link-unseen`, and it sits at the top of the page, so it never
+   makes the page taller. */
+.coil-status {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* The shine */
 
 /*

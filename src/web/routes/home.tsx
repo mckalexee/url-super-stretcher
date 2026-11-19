@@ -432,6 +432,10 @@ function Result({
   );
 }
 
+// The button's label while a stretch is pending. Screen readers hear the same word while the coil
+// plays.
+const STRETCHING = "Stretching";
+
 type ActionData = Route.ComponentProps["actionData"];
 type StretchResult = Extract<NonNullable<ActionData>, { ok: true }>;
 type Rejection = Extract<NonNullable<ActionData>, { ok: false }>;
@@ -460,8 +464,14 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   // The long link of a result that has to arrive at rest, because the coil brought it in or was
   // stopped on its way.
   const [restingLink, setRestingLink] = useState<string | null>(null);
+  // The home form's generation, which is part of its key. The coil overwrites the field, so a
+  // coil that ends without a result, as on a navigation to the home page, leaves a new form.
+  const [homeForm, setHomeForm] = useState(0);
   if (actionData !== seen) {
     setSeen(actionData);
+    if (coil !== null) {
+      setHomeForm((generation) => generation + 1);
+    }
     // Only a stretch from the home page's form coils. The form under a result has no field on
     // the coil's line.
     const fromHome = !(seen?.ok ?? false);
@@ -530,6 +540,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
               longLink,
               originalLength,
               figures: (length) => countedFigures(originalLength, length),
+              announcement: STRETCHING,
               onComplete: () => setCoil((current) => current && { ...current, phase: "landing" }),
               onLanded: rest,
               onDropped: rest,
@@ -557,19 +568,23 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   // The home page's form keeps its key while the coil plays, so the field keeps the visitor's
   // link for the coil to overwrite, and its button keeps the label it had at the submission. The
   // result's form is new for each result, which clears its field.
+  //
+  // In the finale, the home page and the result are both in the page. The frozen form is inert,
+  // so it gives up its ids, and the ids and the label of the result's form stay unique.
   const renderForm = (shown: StretchResult | null) => {
     const frozen = shown === null && coil !== null;
     const busy = stretching || frozen;
+    const id = (name: string) => (frozen ? undefined : name);
     return (
       <Form
         method="post"
         className={shown ? "stretch-form again" : "stretch-form"}
-        key={shown ? `form:${shown.longLink}` : "form"}
+        key={shown ? `form:${shown.longLink}` : `form:home:${homeForm}`}
       >
         {shown ? <h2>Stretch another link</h2> : null}
         <fieldset
           className="flavors"
-          aria-describedby={flavorError === null || shown ? undefined : "flavor-error"}
+          aria-describedby={flavorError === null || shown ? undefined : id("flavor-error")}
         >
           <legend>Finish</legend>
           <div className="flavor-list">
@@ -587,14 +602,14 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             ))}
           </div>
           {flavorError === null || shown ? null : (
-            <p className="field-error" id="flavor-error">
+            <p className="field-error" id={id("flavor-error")}>
               {flavorError}
             </p>
           )}
         </fieldset>
 
         <div className="go">
-          <label className="field-label" htmlFor="url">
+          <label className="field-label" htmlFor={id("url")}>
             Your link
           </label>
           <input
@@ -602,7 +617,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             // the form that stays.
             ref={frozen ? undefined : urlInput}
             className="field-input"
-            id="url"
+            id={id("url")}
             name="url"
             // Not `type="url"`: the server decides what counts as a link, and its message says
             // why, which the browser's own check would replace with a generic one.
@@ -614,13 +629,13 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             placeholder="https://example.com"
             defaultValue={shown ? "" : (rejection?.values.url ?? "")}
             aria-invalid={urlError === null || shown ? undefined : true}
-            aria-describedby={urlError === null || shown ? undefined : "url-error"}
+            aria-describedby={urlError === null || shown ? undefined : id("url-error")}
           />
           <button type="submit" className="button button-solid" disabled={busy}>
-            {busy ? "Stretching" : "Stretch link"}
+            {busy ? STRETCHING : "Stretch link"}
           </button>
           {urlError === null || shown ? null : (
-            <p className="field-error" id="url-error">
+            <p className="field-error" id={id("url-error")}>
               {urlError}
             </p>
           )}
