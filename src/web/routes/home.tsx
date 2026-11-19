@@ -11,6 +11,7 @@ import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
+import { SHARE_IMAGES, shareMeta } from "#web/share.ts";
 
 import type { Route } from "./+types/home.ts";
 
@@ -71,10 +72,11 @@ const sampleRandom: RandomSource = (bytes) => {
 /**
  * Gives the page its flavors, each with a piece of its own output for the gold bar. They come
  * from the loader, not from an import in the component, so the flavor generators stay out of
- * the browser bundle.
+ * the browser bundle. The site's origin goes along for the share tags.
  */
-export function loader() {
+export function loader({ url }: Route.LoaderArgs) {
   return {
+    origin: url.origin,
     flavors: FLAVORS.map(({ id, name, description }) => ({
       id,
       name,
@@ -165,14 +167,24 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { ok: true as const, longLink, flavor: link.flavor, statistics };
 }
 
-/** Title and description for the home route. */
-export function meta() {
+const DESCRIPTION = "Make your links appear longer and more intimidating.";
+
+/** Title, description, and share tags for the home route. */
+export function meta({ loaderData }: Route.MetaArgs) {
+  // The error page renders this route's meta with no loader data.
+  const origin = (loaderData as Route.ComponentProps["loaderData"] | undefined)?.origin;
   return [
     { title: "URL Super Stretcher" },
-    {
-      name: "description",
-      content: "Make your links appear longer and more intimidating.",
-    },
+    { name: "description", content: DESCRIPTION },
+    ...(origin === undefined
+      ? []
+      : shareMeta({
+          origin,
+          title: "URL Super Stretcher",
+          description: DESCRIPTION,
+          image: SHARE_IMAGES.home,
+          path: "/",
+        })),
   ];
 }
 

@@ -1,3 +1,15 @@
 User-agent: *
 Allow: /
 Disallow: /to/
+
+# The fetchers that build a link's preview card for a social platform or a message app. Without
+# this group, a shared stretched link shows no card. The link pages still send
+# `X-Robots-Tag: noindex, nofollow`, so nothing indexes them.
+User-agent: facebookexternalhit
+User-agent: Twitterbot
+User-agent: LinkedInBot
+User-agent: Slackbot
+User-agent: Discordbot
+User-agent: WhatsApp
+User-agent: TelegramBot
+Allow: /

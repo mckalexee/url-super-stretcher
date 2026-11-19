@@ -50,6 +50,17 @@ function countLookups(): { count: number } {
 }
 
 describe("GET /", () => {
+  it("describes the site for a share card", async () => {
+    const page = await (await exports.default.fetch("http://example.com/")).text();
+
+    expect(page).toContain('<meta property="og:title" content="URL Super Stretcher"/>');
+    expect(page).toContain(
+      '<meta property="og:image" content="http://example.com/share/home.jpg"/>',
+    );
+    expect(page).toContain('<meta property="og:url" content="http://example.com/"/>');
+    expect(page).toContain('<meta name="twitter:card" content="summary_large_image"/>');
+  });
+
   it("renders the form with the URL field and every flavor", async () => {
     const response = await exports.default.fetch("http://example.com/");
 
