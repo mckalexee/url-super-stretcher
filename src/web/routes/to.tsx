@@ -67,7 +67,7 @@ export async function loader({ url, context }: Route.LoaderArgs) {
     // The hostname is safe to log, unlike the URL, whose query string can carry a token.
     log.info("stretch.view_blocked", { hostname });
     return data(
-      { state: "flagged" as const, hostname, length: longLink.length, report },
+      { state: "flagged" as const, hostname, report },
       { status: 403, headers: LINK_HEADERS },
     );
   }
@@ -95,7 +95,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
   // A thrown 404 renders the error page with no loader data.
   const state = (loaderData as Route.ComponentProps["loaderData"] | undefined)?.state;
   if (state === "active") {
-    return [{ title: "You have reached the end of the link" }];
+    return [{ title: "Link destination" }];
   }
   return [{ title: state === "flagged" ? "Link blocked" : "Link removed" }];
 }
@@ -126,11 +126,8 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
   if (loaderData.state === "removed") {
     return (
       <main>
-        <h1>Link removed.</h1>
-        <p>
-          This link was removed after a report. It no longer leads anywhere, which it now does at
-          considerable length.
-        </p>
+        <h1>Link removed</h1>
+        <p>This link was removed after an abuse report.</p>
       </main>
     );
   }
@@ -138,15 +135,14 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
   if (loaderData.state === "flagged") {
     return (
       <main>
-        <h1>Link blocked.</h1>
-        <p>This link leads to a destination that is on a security blocklist, so it ends here.</p>
+        <h1>Link blocked</h1>
+        <p>This link's destination is on a security blocklist.</p>
         {/* Text, not a link: the page offers no way to the destination. */}
         <p className="destination-host" data-testid="blocked-host">
           <Hostname name={loaderData.hostname} />
         </p>
         <p className="journey">
-          The link is still {numberFormat.format(loaderData.length)} characters long. None of them
-          lead anywhere. <a href={loaderData.report}>Report abuse</a>
+          <a href={loaderData.report}>Report a problem with this link</a>
         </p>
       </main>
     );
@@ -162,14 +158,16 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
       </h1>
       {loaderData.internationalized ? (
         <p className="field-error">
-          This name uses non-Latin characters, shown here in their ASCII form. A name like this can
-          imitate another site.
+          This name contains non-Latin characters, shown here in ASCII form. Names like this can
+          imitate other sites.
         </p>
       ) : null}
       <p className="destination-url" data-testid="destination-url">
         {loaderData.url}
       </p>
-      <p className="field-hint">Check the name before you continue. Anyone can stretch a link.</p>
+      <p className="field-hint">
+        An anonymous visitor created this link. Check the destination before you continue.
+      </p>
       <div className="result-actions">
         <a className="button button-primary" href={loaderData.url} rel="noreferrer nofollow">
           Continue
@@ -177,8 +175,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
         <a href={loaderData.report}>Report this link</a>
       </div>
       <p className="journey">
-        You traveled {numberFormat.format(loaderData.length)} characters to get here. None of them
-        were strictly necessary.
+        This link is {numberFormat.format(loaderData.length)} characters long.
       </p>
     </main>
   );

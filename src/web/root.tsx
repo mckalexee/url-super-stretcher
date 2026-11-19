@@ -73,21 +73,16 @@ export function Layout({ children }: { children: ReactNode }) {
           <Link to="/" className="site-name">
             URL Super Stretcher
           </Link>
-          <span className="site-claim">Enterprise-grade link elongation</span>
         </header>
         <div className="tape tape-strip" aria-hidden="true" />
         {children}
-        <footer className="site-footer">
-          <p>
-            URL Super Stretcher is satire. The links work anyway.
-            {abuseEmail ? (
-              <>
-                {" "}
-                <a href={`mailto:${abuseEmail}`}>Report abuse</a>
-              </>
-            ) : null}
-          </p>
-        </footer>
+        {abuseEmail ? (
+          <footer className="site-footer">
+            <p>
+              <a href={`mailto:${abuseEmail}`}>Report abuse</a>
+            </p>
+          </footer>
+        ) : null}
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -137,7 +132,8 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <p>{messageFor(error)}</p>
         {error.status === 404 && pathname.startsWith(LINK_PREFIX) ? (
           <p className="error-note">
-            If this was a stretched link, some of it is missing. We recommend copying all of it.
+            If you followed a stretched link, part of it is missing. Copy the entire link and try
+            again.
           </p>
         ) : null}
       </main>

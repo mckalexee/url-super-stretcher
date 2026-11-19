@@ -126,11 +126,6 @@ main {
   text-decoration: underline;
 }
 
-.site-claim {
-  color: var(--muted);
-  font-size: 0.9375rem;
-}
-
 /*
  * The tape. Fine ticks every 8px and a taller tick every 80px, ruled along the top edge the way a
  * tape measure is printed.
@@ -326,11 +321,6 @@ main {
    shows no focus ring. */
 [tabindex="-1"]:focus {
   outline: none;
-}
-
-.result-lede {
-  margin-top: 0.75rem;
-  font-size: 1.125rem;
 }
 
 /*

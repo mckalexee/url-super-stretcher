@@ -13,7 +13,7 @@ import { cloudflareContext } from "#web/context.ts";
 
 import type { Route } from "./+types/home.ts";
 
-// The longest post that the statistics assume when they count posts per link.
+// The longest post that the specifications assume when they count posts per link.
 const POST_LENGTH = 280;
 // A typing speed of 40 words a minute, at the usual five characters a word.
 const TYPED_CHARACTERS_PER_MINUTE = 200;
@@ -88,7 +88,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       {
         ok: false as const,
         field: "flavor" as const,
-        message: "Choose one of the listed methods.",
+        message: "Select a finish.",
         values,
       },
       { status: 400 },
@@ -114,26 +114,17 @@ export async function action({ request, context }: Route.ActionArgs) {
   const { success } = await env.CREATE_LIMITER.limit({ key: client });
   if (!success) {
     log.info("stretch.rate_limited");
-    return reject(
-      429,
-      "That's more than five links in a minute, which is our limit. Wait a minute, then stretch again. Quality elongation takes time.",
-    );
+    return reject(429, "The limit is five links per minute. Try again in a minute.");
   }
 
   if (await isHostBlocked(env.LINKS, target.hostname)) {
-    return reject(
-      400,
-      "Links to that destination were removed after a report, and we don't stretch new ones.",
-    );
+    return reject(400, "Links to that destination aren't available.");
   }
   // A failed check lets the link through, because an outage of the resolver must not take the
   // site down. The link's page checks again on every view.
   if ((await checkReputation(target.hostname)) === "flagged") {
     log.info("stretch.target_flagged", { hostname: target.hostname });
-    return reject(
-      400,
-      "That destination is on a security blocklist. We don't stretch links to it, at any length.",
-    );
+    return reject(400, "That destination is on a security blocklist.");
   }
 
   const link = await createLink(env.LINKS, target, values.flavor);
@@ -152,11 +143,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 /** Title and description for the home route. */
 export function meta() {
   return [
-    { title: "URL Super Stretcher: enterprise-grade link elongation" },
+    { title: "URL Super Stretcher" },
     {
       name: "description",
-      content:
-        "Paste a short link and get a much longer one that goes to the same place. Four methods of elongation. No reduction in destination.",
+      content: "Make your links appear longer and more intimidating.",
     },
   ];
 }
@@ -199,12 +189,12 @@ function CopyButton({ text }: { text: string }) {
           );
         }}
       >
-        Copy link
+        Copy
       </button>
       {/* The live region is in the page before its text changes, so screen readers announce it. */}
       <output className="copy-status">
-        {status === "copied" ? "Copied. All of it." : null}
-        {status === "failed" ? "Copying failed. Select the link and copy it by hand." : null}
+        {status === "copied" ? "Copied" : null}
+        {status === "failed" ? "Couldn't copy. Select the link and copy it manually." : null}
       </output>
     </>
   );
@@ -222,54 +212,49 @@ function Result({ longLink, statistics }: { longLink: string; statistics: Stretc
   return (
     <section aria-labelledby="result-heading">
       <h1 id="result-heading" ref={heading} tabIndex={-1}>
-        Link stretched.
+        Your link is ready
       </h1>
-      <p className="result-lede">
-        {statistics.gained > 0
-          ? "Same destination. Considerably more link."
-          : "Your link was already longer than ours. We respect that."}
-      </p>
       <p className="tape long-link" data-testid="long-link">
         {longLink}
       </p>
       <div className="result-actions">
         <CopyButton text={longLink} />
         <a className="button" href={longLink} rel="nofollow noreferrer">
-          Try the link
+          Open
         </a>
       </div>
       <table className="report">
-        <caption>Elongation report</caption>
+        <caption>Specifications</caption>
         <tbody>
           <tr>
             <th scope="row">Original length</th>
             <td>{numberFormat.format(statistics.originalLength)} characters</td>
           </tr>
           <tr>
-            <th scope="row">Stretched length</th>
+            <th scope="row">New length</th>
             <td>{numberFormat.format(statistics.stretchedLength)} characters</td>
           </tr>
           <tr>
-            <th scope="row">Characters gained</th>
-            <td>{numberFormat.format(statistics.gained)}</td>
-          </tr>
-          <tr>
-            <th scope="row">Growth</th>
+            <th scope="row">Increase</th>
             <td>{numberFormat.format(statistics.growthPercent)}%</td>
           </tr>
           <tr>
-            <th scope="row">Posts needed to share it, at {POST_LENGTH} characters a post</th>
+            <th scope="row">Characters added</th>
+            <td>{numberFormat.format(statistics.gained)}</td>
+          </tr>
+          <tr>
+            <th scope="row">Posts required to share, at {POST_LENGTH} characters each</th>
             <td>{numberFormat.format(statistics.posts)}</td>
           </tr>
           <tr>
             <th scope="row">
-              Time to type it by hand, at {TYPED_CHARACTERS_PER_MINUTE} characters a minute
+              Time to type by hand, at {TYPED_CHARACTERS_PER_MINUTE} characters per minute
             </th>
             <td>{formatDuration(statistics.typingSeconds)}</td>
           </tr>
           <tr>
-            <th scope="row">Change in destination</th>
-            <td>None</td>
+            <th scope="row">Destination</th>
+            <td>Unchanged</td>
           </tr>
         </tbody>
       </table>
@@ -304,11 +289,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         <Result key={result.longLink} longLink={result.longLink} statistics={result.statistics} />
       ) : (
         <>
-          <h1 className="hero-title">Your link is too short.</h1>
-          <p className="lede">
-            URL Super Stretcher adds hundreds of characters to any link without changing where it
-            goes. Paste one in. It leaves longer.
-          </p>
+          <h1 className="hero-title">Your link is too short</h1>
+          <p className="lede">Make your links appear longer and more intimidating.</p>
         </>
       )}
 
@@ -317,7 +299,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
       <Form method="post" className="stretch-form" key={result?.longLink ?? "first"}>
         <div>
           <label className="field-label" htmlFor="url">
-            Link to lengthen
+            Your link
           </label>
           <input
             ref={urlInput}
@@ -334,23 +316,20 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             placeholder="https://example.com"
             defaultValue={rejection?.values.url ?? ""}
             aria-invalid={urlError === null ? undefined : true}
-            aria-describedby={urlError === null ? "url-hint" : "url-error url-hint"}
+            aria-describedby={urlError === null ? undefined : "url-error"}
           />
           {urlError === null ? null : (
             <p className="field-error" id="url-error">
               {urlError}
             </p>
           )}
-          <p className="field-hint" id="url-hint">
-            The shorter it is, the more we can do for it.
-          </p>
         </div>
 
         <fieldset
           className="flavors"
           aria-describedby={flavorError === null ? undefined : "flavor-error"}
         >
-          <legend>Method of elongation</legend>
+          <legend>Finish</legend>
           <div className="flavor-list">
             {loaderData.flavors.map((flavor) => (
               <label className="flavor" key={flavor.id}>
