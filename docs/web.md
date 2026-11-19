@@ -172,7 +172,9 @@ the complete document instead of a stream. `streamTimeout` gives deferred loader
 
 The site has one hand-written stylesheet, `src/web/app.css`. `src/web/root.tsx` imports its URL
 with `./app.css?url` and returns it from the `links` export, so every page loads it, including the
-error page. Fonts come from system font stacks, so the page calls no third-party origin.
+error page. The stylesheet imports its two fonts from Fontsource packages, and the build ships
+them with the app, so the page calls no third-party origin. [design.md](design.md) describes the
+site's look.
 
 The `?url` import has no value in the test runtime, so the tests can't check the stylesheet link.
 To check it, load a page from `pnpm dev` or read the build output.

@@ -181,7 +181,7 @@ function CopyButton({ text }: { text: string }) {
     <>
       <button
         type="button"
-        className="button"
+        className="button button-primary"
         onClick={() => {
           navigator.clipboard.writeText(text).then(
             () => setStatus("copied"),
@@ -214,7 +214,7 @@ function Result({ longLink, statistics }: { longLink: string; statistics: Stretc
       <h1 id="result-heading" ref={heading} tabIndex={-1}>
         Your link is ready
       </h1>
-      <p className="tape long-link" data-testid="long-link">
+      <p className="long-link" data-testid="long-link">
         {longLink}
       </p>
       <div className="result-actions">
@@ -289,7 +289,9 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         <Result key={result.longLink} longLink={result.longLink} statistics={result.statistics} />
       ) : (
         <>
-          <h1 className="hero-title">Your link is too short</h1>
+          <h1 className="hero-title">
+            <span>Your link is</span> <span>too short</span>
+          </h1>
           <p className="lede">Make your links appear longer and more intimidating.</p>
         </>
       )}
