@@ -263,4 +263,6 @@ The other failures describe the skill's kit and not a defect:
   finish.
 - `hero-enter` and `moment-none` ask for the kit's entrance and its moment. The site's motion is
   its own, in [Motion](#motion).
+- `motion-layer` sees `data-motion` on `<html>` and looks for the kit's `motion.css`. The
+  attribute is the site's own motion switch.
 - `copy-fact` and the other copy checks don't apply. [copy.md](copy.md) decides the copy.
