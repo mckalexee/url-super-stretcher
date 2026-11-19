@@ -167,6 +167,27 @@ main.coil-arriving {
 }
 
 /*
+ * Phone mode. The text sits centered on its path, so a lane's letters are as far from the lane
+ * inside as from the lane outside, whichever way up they are. A gap is the dark cut that a
+ * newer strand of the tangle makes in an older one where it crosses, drawn under the newer
+ * strand's letters. The page's frame is pinned to the screen for the run, so the text runs
+ * inside the frame whatever the scroll, and coil.js lets it go as the finale starts.
+ */
+.coil-overlay.coil-phone text {
+  dominant-baseline: central;
+}
+
+.coil-overlay .coil-gap {
+  fill: none;
+  stroke: var(--black);
+  stroke-linecap: round;
+}
+
+body.coil-pinned::before {
+  position: fixed;
+}
+
+/*
  * The well on the result. A break after any character makes its rows a strict grid, so the row
  * that a character lands in is known before the result is on the page.
  */
@@ -246,6 +267,24 @@ main.coil-arriving {
   display: none;
 }
 
+/* The variants are the phone's, so a wide window doesn't offer them. */
+@media (min-width: 900px) {
+  .review-bar select {
+    display: none;
+  }
+}
+
+/* A phone has no room inside the lanes, so the toolbar sits over the top of the screen. */
+@media (max-width: 899px) {
+  .review-bar {
+    top: 4px;
+    right: 4px;
+    left: 4px;
+    flex-wrap: wrap;
+  }
+}
+
+.review-bar select,
 .review-bar button {
   padding: 3px 10px;
   border: 1px solid #8a8a8a;

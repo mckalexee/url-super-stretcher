@@ -5,6 +5,8 @@
   one real stretch held in a template until the finale. The site's own stylesheet gives it its
   look, coil.css adds the transition's styles, and coil.js plays it and documents the query
   parameters for review. The toolbar in the corner is for review and isn't part of the site.
+  In a window narrower than 900px, the lab plays the phone's variants instead, which the
+  toolbar's menu switches.
 -->
 <html lang="en">
   <head>
@@ -220,6 +222,11 @@
     <div class="review-bar" role="group" aria-label="Review controls">
       <button type="button" data-review="play">Play</button>
       <button type="button" data-review="reset">Reset</button>
+      <select data-review="variant" aria-label="Phone variant">
+        <option value="tangle">Tangle</option>
+        <option value="snake">Snake</option>
+        <option value="vortex">Vortex</option>
+      </select>
       <output data-review="readout"></output>
     </div>
   </body>
