@@ -1,7 +1,5 @@
 // Renovate configuration. Renovate opens grouped update pull requests once a week, pins exact
-// versions, and merges patch updates on its own once CI passes. Blocks between `@starter:mcp` or
-// `@starter:web` and `@starter:end` belong to one half, so a project that drops that half can
-// delete them.
+// versions, and merges patch updates on its own once CI passes.
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   // The recommended preset also turns on the github-actions manager, which moves the action major
@@ -47,11 +45,9 @@
       groupName: "oxc",
       matchPackageNames: ["oxlint", "oxfmt", "oxlint-tsgolint"],
     },
-    // @starter:web
     {
       groupName: "react-router",
       matchPackageNames: ["react-router", "@react-router/**"],
     },
-    // @starter:end
   ],
 }

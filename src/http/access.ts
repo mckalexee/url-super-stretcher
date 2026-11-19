@@ -1,17 +1,11 @@
 // Cloudflare Access identity. It resolves who made a request from what Access forwards, and accepts
 // an identity only for the Access application that `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` name.
-// @starter:web
 // It also gates the web app's private routes. Whether the site is private is runtime
 // configuration, not code: `WEB_ACCESS` is `public` or `private`.
-// @starter:end
-// @starter:web
 import { createMiddleware } from "hono/factory";
-// @starter:end
 import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 
-// @starter:web
 import { HttpError, UpstreamError } from "#lib/errors.ts";
-// @starter:end
 import { log } from "#lib/log.ts";
 
 /** The signed-in person behind a request, as Cloudflare Access reports them. */
@@ -20,7 +14,6 @@ export interface Identity {
   name?: string;
 }
 
-// @starter:web
 /** Hono context variables that `requireIdentity()` sets. */
 export interface AccessVariables {
   /** The identity of the request, or `null` when it has none. */
@@ -32,7 +25,6 @@ export interface AccessEnv {
   Bindings: Env;
   Variables: AccessVariables;
 }
-// @starter:end
 
 /** The Access application that every accepted identity belongs to. */
 interface AccessConfig {
@@ -71,7 +63,6 @@ function keySetFor(teamDomain: string) {
   return keySet;
 }
 
-// @starter:web
 /**
  * Returns whether a private route needs an identity. `WEB_ACCESS` set to `private` makes the site
  * private, and then both Access vars must be set. Any other value throws, and so does `private`
@@ -90,7 +81,6 @@ export function identityRequired(env: Env): boolean {
   }
   return true;
 }
-// @starter:end
 
 // These codes mean that the certificates endpoint failed, not that the token is bad.
 const KEY_SET_FAILURES = new Set([
@@ -183,7 +173,6 @@ export async function resolveIdentity(
   return token ? identityFromToken(token, config) : null;
 }
 
-// @starter:web
 /**
  * Hono middleware that resolves the identity and stores it as the `identity` variable. On a
  * private site, it rejects a request without an identity with a 403 response. On a public site,
@@ -200,4 +189,3 @@ export function requireIdentity() {
     await next();
   });
 }
-// @starter:end

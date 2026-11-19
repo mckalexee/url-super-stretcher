@@ -1,33 +1,21 @@
 // Hono application that serves every request the Worker entry hands it. It owns the plain HTTP
 // routes.
-// @starter:web
 // It passes everything else to the React Router app.
-// @starter:end
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-// @starter:web
 import { createRequestHandler, RouterContextProvider } from "react-router";
-// @starter:end
 
-// @starter:web
 import { type Identity, resolveIdentity } from "#http/access.ts";
-// @starter:end
 import { handleError } from "#http/errors.ts";
 import { logRequests } from "#http/logging.ts";
-// @starter:web
 import { apiRoutes } from "#http/routes/api.ts";
-// @starter:end
 import { healthRoutes } from "#http/routes/health.ts";
-// @starter:web
 import { cloudflareContext, identityResolverContext } from "#web/context.ts";
-// @starter:end
 
-// @starter:web
 const handleWebRequest = createRequestHandler(
   () => import("virtual:react-router/server-build"),
   import.meta.env.MODE,
 );
-// @starter:end
 
 /** Builds the Hono app with its middleware and routes registered in match order. */
 export function createApp() {
@@ -36,9 +24,7 @@ export function createApp() {
   app.use(logRequests);
   // Hono's defaults set no Content-Security-Policy, and this app adds none, so each project sets
   // the policy that fits it.
-  // @starter:web
   // A policy must allow the inline scripts that React Router uses for hydration.
-  // @starter:end
   app.use(
     secureHeaders({
       // Nothing here is meant to be framed.
@@ -51,11 +37,8 @@ export function createApp() {
   app.onError(handleError);
 
   app.route("/", healthRoutes);
-  // @starter:web
   app.route("/api", apiRoutes);
-  // @starter:end
 
-  // @starter:web
   // The catch-all is registered last so that every Hono route matches before React Router.
   app.all("*", (c) => {
     const ctx = c.executionCtx;
@@ -70,7 +53,6 @@ export function createApp() {
     });
     return handleWebRequest(c.req.raw, context);
   });
-  // @starter:end
 
   return app;
 }

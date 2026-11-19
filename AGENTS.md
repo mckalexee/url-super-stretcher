@@ -1,23 +1,21 @@
 # url-super-stretcher
 
-<!-- setup:begin -->
-
-> [!IMPORTANT]
-> Setup isn't finished. Run `node scripts/setup.ts` before any other work, and follow what it
-> prints.
-
-<!-- setup:end -->
-
 One Cloudflare Worker with Hono in front. The README says what the project is and how to run it.
 This file holds what you need to change it well.
 
-Halves present: MCP endpoint (OAuth), web app.
-
-<!-- @starter:web -->
+Halves present: web app.
 
 The web app is React Router 8 behind Hono, and Cloudflare Access can make it private.
 
-<!-- @starter:end -->
+## What to build
+
+Stretches any URL into an absurdly long link that still redirects to the original, a satire of link
+shorteners. First, build a home page where a visitor pastes a URL and picks a flavor (corporate
+jargon, legalese, a long run of o's, or a tracking-parameter pile), and a redirect route that
+resolves the long link from KV storage.
+
+The person who started this project wrote this brief during setup. Change it as the plan changes,
+and delete this section once it stops helping.
 
 ## Commands
 
@@ -47,8 +45,6 @@ module outside the current directory through its `#` subpath with the file exten
 
 ## Checklists
 
-<!-- @starter:web -->
-
 ### Add a route
 
 - HTTP route: add it to a router in `src/http/routes/`, mount it in `src/http/index.ts` before
@@ -56,8 +52,6 @@ module outside the current directory through its `#` subpath with the file exten
 - Web page: add a module in `src/web/routes/` and an entry in `src/web/routes.ts`. On a private
   site, it needs an Access identity unless its pattern is in `PUBLIC_PATHS` in `src/web/root.tsx`.
 - Add tests in `test/http/` or `test/web/`.
-
-<!-- @starter:end -->
 
 ### Add a binding, var, or secret
 
@@ -75,21 +69,13 @@ module outside the current directory through its `#` subpath with the file exten
 - pnpm refuses a dependency version that's younger than one day. To use one, commit its
   `minimumReleaseAgeExclude` entry in `pnpm-workspace.yaml`, or pick an older version.
 
-<!-- @starter:access -->
-
 - Identity goes through `src/http/access.ts`. `ctx.access` is absent behind the static assets
   router in production, so `access.ts` verifies the `Cf-Access-Jwt-Assertion` header itself.
   Don't read `ctx.access` anywhere else.
 - `access.dev.aud` in `wrangler.jsonc` must equal `ACCESS_AUD`, or `pnpm dev` has no identity.
 
-<!-- @starter:end -->
-
-<!-- @starter:web -->
-
 - `WEB_ACCESS` alone decides whether the web app is private. It has the same value in `vars` and
   `previews.vars`.
-
-<!-- @starter:end -->
 
 ## Writing
 
@@ -102,8 +88,4 @@ Topic guides:
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.
 
-<!-- @starter:web -->
-
 - [docs/web.md](docs/web.md): the web app, identity, and the Cloudflare Access applications.
-
-<!-- @starter:end -->

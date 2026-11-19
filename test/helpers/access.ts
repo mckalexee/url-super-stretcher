@@ -92,7 +92,6 @@ export function useAccessVars(): (teamDomain: string, aud: string) => void {
   };
 }
 
-// @starter:web
 /**
  * Lets a test file change `WEB_ACCESS`, the same way as `useAccessVars()`. The hook restores the
  * value from `wrangler.jsonc` after each test.
@@ -106,4 +105,3 @@ export function useWebAccess(): (value: string) => void {
     env.WEB_ACCESS = value;
   };
 }
-// @starter:end

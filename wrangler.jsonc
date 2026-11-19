@@ -1,6 +1,4 @@
-// Wrangler configuration for the Worker: its runtime flags, bindings, and vars. Blocks between
-// `@starter:mcp`, `@starter:oauth`, `@starter:web`, or `@starter:access` and `@starter:end` belong
-// to one part of the template, so a project that drops that part can delete them.
+// Wrangler configuration for the Worker: its runtime flags, bindings, and vars.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "url-super-stretcher",
@@ -20,17 +18,13 @@
   "vars": {
     "APP_NAME": "URL Super Stretcher",
     "ENVIRONMENT": "production",
-    // @starter:web
     // Whether the web app's private routes need a Cloudflare Access identity: `public` or
     // `private`. `private` needs both Access vars, and fails closed without them.
     "WEB_ACCESS": "public",
-    // @starter:end
-    // @starter:access
     // Cloudflare Access team domain and the AUD tag of the Access application. Identities from any
     // other application are rejected. With both empty, no request has an identity.
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": "",
-    // @starter:end
   },
   // Previews inherit nothing from production, so every var and binding is declared again.
   // `secrets` isn't inherited either. Previews get secrets from `--secrets-file` or the base config.
@@ -38,17 +32,12 @@
     "vars": {
       "APP_NAME": "URL Super Stretcher",
       "ENVIRONMENT": "preview",
-      // @starter:web
       // The same value as in production.
       "WEB_ACCESS": "public",
-      // @starter:end
-      // @starter:access
       "ACCESS_TEAM_DOMAIN": "",
       "ACCESS_AUD": "",
-      // @starter:end
     },
   },
-  // @starter:access
   // Fakes `ctx.access` under `pnpm dev`. Production has no `ctx.access` behind the static assets
   // router. `src/http/access.ts` accepts the fake only when `aud` equals `ACCESS_AUD`, so keep the
   // two values the same.
@@ -58,5 +47,4 @@
       "identity": { "email": "dev@example.com", "name": "Dev User" },
     },
   },
-  // @starter:end
 }

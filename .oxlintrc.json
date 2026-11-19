@@ -5,28 +5,15 @@
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
-  "plugins": [
-    // @starter:web
-    "react",
-    "jsx-a11y",
-    // @starter:end
-    "typescript",
-    "unicorn",
-    "oxc",
-    "import",
-    "promise",
-    "vitest"
-  ],
+  "plugins": ["react", "jsx-a11y", "typescript", "unicorn", "oxc", "import", "promise", "vitest"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "warn"
   },
   "rules": {
-    // @starter:web
     // The automatic JSX runtime (`jsx: react-jsx`) imports React for you.
     "react/react-in-jsx-scope": "off",
-    // @starter:end
     "eqeqeq": "error",
     "no-console": "error",
     "import/no-cycle": "error",

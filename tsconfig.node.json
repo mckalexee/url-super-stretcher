@@ -16,12 +16,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": [
-    "vite.config.ts",
-    "vitest.config.ts",
-    // @starter:web
-    "react-router.config.ts",
-    // @starter:end
-    "scripts/**/*"
-  ]
+  "include": ["vite.config.ts", "vitest.config.ts", "react-router.config.ts", "scripts/**/*"]
 }

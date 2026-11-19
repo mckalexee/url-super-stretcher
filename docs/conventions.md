@@ -23,11 +23,7 @@ listing or a description of a function signature. Duplicated facts drift apart o
 - Each directory under `src/` owns one area. `http` holds the Hono routes and middleware, and
   `lib` holds shared helpers with no knowledge of any area.
 
-<!-- @starter:web -->
-
 - `web` holds the React Router app.
-
-<!-- @starter:end -->
 
 - Tests live in `test/`, in a directory named after the area they cover, as
   `test/<area>/<subject>.test.ts`.
@@ -36,12 +32,8 @@ listing or a description of a function signature. Duplicated facts drift apart o
   `import { log } from "#lib/log.ts"`. Use a relative import only for a sibling file, or for a
   test helper in `test/helpers/` (`../helpers/network.ts`), which the `#` import doesn't cover.
 
-<!-- @starter:web -->
-
 - React Router route modules follow the URL, such as `routes/account.tsx`, and import the route
   types that React Router generates through a relative path (`./+types/home.ts`).
-
-<!-- @starter:end -->
 
 - Always write the file extension in an import path. Node subpath imports map the specifier
   straight to a file, so the specifier must carry the extension for `#` imports to resolve.

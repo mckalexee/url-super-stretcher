@@ -1,9 +1,7 @@
 // Test runner configuration. Tests run inside workerd through the Cloudflare plugin, so they use
 // the same bindings and runtime APIs as the deployed Worker.
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
-// @starter:web
 import { reactRouter } from "@react-router/dev/vite";
-// @starter:end
 import { defineConfig } from "vitest/config";
 import { unstable_readConfig } from "wrangler";
 
@@ -34,10 +32,8 @@ for (const [key, value] of Object.entries(TEST_SECRETS)) {
 
 export default defineConfig({
   plugins: [
-    // @starter:web
     // Resolves `virtual:react-router/server-build`, so tests reach the real Worker entry.
     reactRouter(),
-    // @starter:end
     cloudflareTest({
       wrangler: { configPath: WRANGLER_CONFIG },
       miniflare: {
@@ -48,14 +44,12 @@ export default defineConfig({
       },
     }),
   ],
-  // @starter:web
   // The React Router plugin sets its own resolve conditions for the `ssr` environment, which
   // drops the Workers conditions. These match the Cloudflare Vite plugin's production build, so
   // packages such as `@msw/cloudflare` load their Workers entry instead of their Node entry.
   environments: {
     ssr: { resolve: { conditions: ["workerd", "worker", "module", "browser"] } },
   },
-  // @starter:end
   test: {
     // Tests live in `test/`, as docs/conventions.md says. Nothing else runs in workerd.
     dir: "test",

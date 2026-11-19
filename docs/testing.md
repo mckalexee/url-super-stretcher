@@ -32,8 +32,6 @@ fails and the normal run passes, a test depends on the order the files run in.
   your local values out of the tests. Give a new secret a value in `TEST_SECRETS` unless the tests
   expect it to be unset.
 
-<!-- @starter:web -->
-
 - `reactRouter()` in `plugins` resolves `virtual:react-router/server-build`, so requests reach the
   real Worker entry and the real web app.
 - `environments.ssr.resolve.conditions` puts back the Workers resolve conditions (`workerd`,
@@ -41,8 +39,6 @@ fails and the normal run passes, a test depends on the order the files run in.
   environment, which drops them, and without them packages such as `@msw/cloudflare` load their
   Node entry instead of their Workers entry. The values match the Cloudflare Vite plugin's
   production build.
-
-<!-- @starter:end -->
 
 - `testTimeout` is 15 seconds instead of vitest's 5. The first request in a test file loads the
   Worker and its dependencies, which can take longer than five seconds on a busy machine.
@@ -60,14 +56,10 @@ import { exports } from "cloudflare:workers";
 const response = await exports.default.fetch("http://example.com/healthz");
 ```
 
-<!-- @starter:access -->
-
 The vitest plugin doesn't populate `ctx.access`. To test the `ctx.access` branch of
 `resolveIdentity()`, call it directly with a context object that has an `access` property, as
 `test/http/access.test.ts` does. Requests with a `Cf-Access-Jwt-Assertion` header test the JWT
 branch.
-
-<!-- @starter:end -->
 
 ## Change vars in a test
 
@@ -75,18 +67,10 @@ branch.
 changes what the Worker sees. Restore every change after the test, or a later test sees it. For
 a one-off change, save the value and restore it in `finally`.
 
-<!-- @starter:access -->
-
 `useAccessVars()` from `test/helpers/access.ts` returns a setter for `ACCESS_TEAM_DOMAIN` and
 `ACCESS_AUD`, and restores them after each test.
 
-<!-- @starter:end -->
-
-<!-- @starter:web -->
-
 `useWebAccess()` from the same file does the same for `WEB_ACCESS`.
-
-<!-- @starter:end -->
 
 To pass different bindings to one call only, spread `env` into a new object, such as
 `{ ...env, APP_NAME: "Test" }`, and pass it to code that takes `env` as an argument. The Hono
@@ -117,8 +101,6 @@ it("reads the upstream value", async () => {
 });
 ```
 
-<!-- @starter:access -->
-
 ## Test Cloudflare Access
 
 `createAccessIssuer()` from `test/helpers/access.ts` creates a fake Access issuer with its own
@@ -133,14 +115,8 @@ test reuses another test's keys. A test enables the network, adds `issuer.certs`
 `useAccessVars()`, and sends the signed token in `Cf-Access-Jwt-Assertion`, as
 `test/http/access.test.ts` does.
 
-<!-- @starter:end -->
-
-<!-- @starter:web -->
-
 A private-site test also sets `WEB_ACCESS` to `private` with `useWebAccess()`, as
 `test/web/account.test.ts` does.
-
-<!-- @starter:end -->
 
 ## Logs in tests
 

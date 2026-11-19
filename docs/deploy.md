@@ -11,11 +11,7 @@ output `wrangler.json`, the static assets, and a redirect file, `.wrangler/deplo
 that points at the output `wrangler.json`. `wrangler deploy` and `wrangler preview` follow the
 redirect, so they deploy the last build. `wrangler types` reads the source `wrangler.jsonc`.
 
-<!-- @starter:web -->
-
 The Worker and its `wrangler.json` go to `build/server/`, and the static assets to `build/client/`.
-
-<!-- @starter:end -->
 
 Always build right before a deploy. A deploy after an edit to `wrangler.jsonc` without a new
 build ships the old configuration. `pnpm run deploy`, `pnpm check:deploy`, and both workflows
