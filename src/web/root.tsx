@@ -1,5 +1,6 @@
-// Root route of the web app. It owns the HTML document shell, the navigation, the identity gate
-// that keeps private routes private, and the error page that every route renders inside.
+// Root route of the web app. It owns the HTML document shell, the site header and footer, the
+// stylesheet, the identity gate that keeps private routes private, and the error page that every
+// route renders inside.
 import type { ReactNode } from "react";
 import {
   type ErrorResponse,
@@ -10,11 +11,14 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 
 import { requireIdentityMiddleware } from "#web/middleware.ts";
 
 import type { Route } from "./+types/root.ts";
+
+import stylesheet from "./app.css?url";
 
 // Route patterns that anyone may see on a private site, written the way React Router reports
 // them, such as `/` or `/blog/:slug`. Every other route needs a Cloudflare Access identity, so a
@@ -25,6 +29,9 @@ const PUBLIC_PATHS = new Set(["/"]);
 export const middleware: Route.MiddlewareFunction[] = [
   (args, next) => (PUBLIC_PATHS.has(args.pattern) ? next() : requireIdentityMiddleware(args, next)),
 ];
+
+/** Loads the site's stylesheet on every page, including the error page. */
+export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
 /** Document shell shared by every route, including error boundaries. */
 export function Layout({ children }: { children: ReactNode }) {
@@ -38,10 +45,17 @@ export function Layout({ children }: { children: ReactNode }) {
         <Links />
       </head>
       <body>
-        <nav>
-          <Link to="/">Home</Link> <Link to="/account">Account</Link>
-        </nav>
+        <header className="site-header">
+          <Link to="/" className="site-name">
+            URL Super Stretcher
+          </Link>
+          <span className="site-claim">Enterprise-grade link elongation</span>
+        </header>
+        <div className="tape tape-strip" aria-hidden="true" />
         {children}
+        <footer className="site-footer">
+          <p>URL Super Stretcher is satire. The links work anyway.</p>
+        </footer>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -76,17 +90,27 @@ function messageFor(error: ErrorResponse): string {
   return STATUS_MESSAGES[error.status] ?? "The request failed.";
 }
 
+// Path prefix of every stretched link. It repeats `LINK_PREFIX` from `src/stretch/links.ts`
+// because importing that module here would ship the link store's code to the browser.
+const STRETCHED_LINK_PREFIX = "/to/";
+
 /**
  * Error page for every route. For a thrown response, it shows the status and the message that
  * the route supplied, or fixed text for the status. Anything else gets a generic message, so that
  * internal errors never reach the browser.
  */
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const { pathname } = useLocation();
   if (isRouteErrorResponse(error)) {
     return (
       <main>
         <h1>{error.status}</h1>
         <p>{messageFor(error)}</p>
+        {error.status === 404 && pathname.startsWith(STRETCHED_LINK_PREFIX) ? (
+          <p className="error-note">
+            If this was a stretched link, some of it is missing. We recommend copying all of it.
+          </p>
+        ) : null}
       </main>
     );
   }

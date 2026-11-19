@@ -1,14 +1,21 @@
 # url-super-stretcher
 
-A Cloudflare Worker with tests that run in workerd and GitHub Actions workflows for CI, pull
-request Previews, and production deploys.
+URL Super Stretcher is a satirical website at [urlsuperstretcher.com](https://urlsuperstretcher.com)
+that does the opposite of a link shortener. You paste a URL, pick a flavor, and get an absurdly
+long link that still redirects to the original. The flavors are corporate jargon, legalese, a long
+run of o's, and a pile of tracking parameters.
 
-It serves a server-rendered web app, which Cloudflare Access can make private.
+It's one Cloudflare Worker that serves a server-rendered web app and stores the links in Workers
+KV. Tests run in workerd, and GitHub Actions workflows cover CI, pull request Previews, and
+production deploys.
 
 ## What you get
 
-**Web app.** A React Router 8 app rendered on the server, behind Hono. Cloudflare Access identity
-reaches loaders and API routes.
+**Web app.** A React Router 8 app rendered on the server, behind Hono. The home page's form works
+without JavaScript. Cloudflare Access identity reaches loaders and API routes.
+
+**Stretched links.** `src/stretch` writes the long links and stores them in the `LINKS` KV
+namespace. `GET /to/*` redirects a stored link to its original URL.
 
 **Tooling.** Hono serves `/healthz` and maps errors to responses. Tests run in workerd, the same
 runtime as production, with no network access. GitHub Actions run CI on every pull request, deploy
@@ -51,7 +58,9 @@ The dev server listens on port 5173 and stops if another process holds that port
 
 - `http://localhost:5173/healthz`: the health check.
 
-- `http://localhost:5173/`: the web app's home page.
+- `http://localhost:5173/`: the home page, with the form that stretches a link.
+- `http://localhost:5173/to/...`: a stretched link, which redirects to its original URL. A path
+  that isn't a stored link gets the 404 page.
 - `http://localhost:5173/account`: the signed-in Access identity, or a public-mode note.
 - `http://localhost:5173/api/me`: the same identity as JSON.
 

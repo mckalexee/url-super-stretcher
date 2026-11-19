@@ -15,6 +15,8 @@
     "logs": { "enabled": true },
     "traces": { "enabled": true, "head_sampling_rate": 0.1 },
   },
+  // The stretched links. Each record maps the hash of a long link to the URL it redirects to.
+  "kv_namespaces": [{ "binding": "LINKS", "id": "c9ef939d6306404a85ea9b4a5c2e73ba" }],
   "vars": {
     "APP_NAME": "URL Super Stretcher",
     "ENVIRONMENT": "production",
@@ -37,6 +39,8 @@
       "ACCESS_TEAM_DOMAIN": "",
       "ACCESS_AUD": "",
     },
+    // A separate namespace keeps links made in a Preview out of production.
+    "kv_namespaces": [{ "binding": "LINKS", "id": "1018c96a87734073a9a877e34f9b42f2" }],
   },
   // Fakes `ctx.access` under `pnpm dev`. Production has no `ctx.access` behind the static assets
   // router. `src/http/access.ts` accepts the fake only when `aud` equals `ACCESS_AUD`, so keep the

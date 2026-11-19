@@ -157,9 +157,18 @@ requests that the client aborted. Errors that happen after the HTML shell has st
 surface in `onError`, which logs them as `ssr.stream_error`. `isbot` detects crawlers, which get
 the complete document instead of a stream. `streamTimeout` gives deferred loader data five seconds.
 
+## Stylesheet
+
+The site has one hand-written stylesheet, `src/web/app.css`. `src/web/root.tsx` imports its URL
+with `./app.css?url` and returns it from the `links` export, so every page loads it, including the
+error page. Fonts come from system font stacks, so the page calls no third-party origin.
+
+The `?url` import has no value in the test runtime, so the tests can't check the stylesheet link.
+To check it, load a page from `pnpm dev` or read the build output.
+
 ## Add Tailwind CSS
 
-The template ships without a CSS framework. To add Tailwind CSS 4:
+The site ships without a CSS framework. To add Tailwind CSS 4:
 
 1. Install the packages:
 
@@ -176,20 +185,13 @@ The template ships without a CSS framework. To add Tailwind CSS 4:
    tailwindcss(),
    ```
 
-3. Create `src/web/app.css`:
+3. Add the import as the first line of `src/web/app.css`:
 
    ```css
    @import "tailwindcss";
    ```
 
-4. In `src/web/root.tsx`, import the stylesheet's URL and export a `links` function:
-
-   ```tsx
-   import stylesheet from "./app.css?url";
-
-   /** Loads the Tailwind stylesheet on every page. */
-   export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
-   ```
+4. Keep the `links` export in `src/web/root.tsx`, which already loads that stylesheet.
 
 5. Run `pnpm verify`.
 
