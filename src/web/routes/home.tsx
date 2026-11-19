@@ -6,7 +6,7 @@ import { data, Form, useNavigation } from "react-router";
 
 import { HttpError } from "#lib/errors.ts";
 import { log } from "#lib/log.ts";
-import { FLAVORS, isFlavorId } from "#stretch/flavors.ts";
+import { FLAVORS, generateStretch, isFlavorId, type RandomSource } from "#stretch/flavors.ts";
 import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
@@ -53,12 +53,34 @@ function textField(form: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+// How much of a stretched link the gold bar on the home page has room for.
+const SAMPLE_LENGTH = 220;
+// The bar runs off the left edge of the page, so its text starts partway through a word.
+const SAMPLE_START = 3;
+
+// Bytes from a fixed sequence, so every visitor sees the same engraving.
+const sampleRandom: RandomSource = (bytes) => {
+  let state = 7;
+  for (let index = 0; index < bytes.length; index += 1) {
+    state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+    bytes[index] = Math.floor(state / 65_536) % 256;
+  }
+};
+
 /**
- * Gives the page its flavors. They come from the loader, not from an import in the component, so
- * the flavor generators stay out of the browser bundle.
+ * Gives the page its flavors, each with a piece of its own output for the gold bar. They come
+ * from the loader, not from an import in the component, so the flavor generators stay out of
+ * the browser bundle.
  */
 export function loader() {
-  return { flavors: FLAVORS.map(({ id, name, description }) => ({ id, name, description })) };
+  return {
+    flavors: FLAVORS.map(({ id, name, description }) => ({
+      id,
+      name,
+      description,
+      sample: generateStretch(id, sampleRandom).slice(SAMPLE_START, SAMPLE_START + SAMPLE_LENGTH),
+    })),
+  };
 }
 
 /**
@@ -361,16 +383,27 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   }, [rejection]);
 
   return (
-    <main>
+    <main className={result ? undefined : "home"}>
       {result ? (
         <Result key={result.longLink} longLink={result.longLink} statistics={result.statistics} />
       ) : (
-        <div className="hero">
-          <h1 className="hero-title">
-            <span>Your link is</span> <span>too short</span>
-          </h1>
-          <p className="lede">Make your links appear longer and more intimidating.</p>
-        </div>
+        <>
+          {/* A picture of the product, with one bar for each finish. The stylesheet shows the
+              bar of the chosen finish. */}
+          <div className="stage" aria-hidden="true">
+            {loaderData.flavors.map((flavor) => (
+              <div className="rig" data-flavor={flavor.id} key={flavor.id}>
+                <div className="bar-shadow" />
+                <div className="bar bar-sharp">{flavor.sample}</div>
+                <div className="bar bar-soft">{flavor.sample}</div>
+              </div>
+            ))}
+          </div>
+          <div className="hero">
+            <h1>Your link is too short</h1>
+            <p className="lede">Make your links appear longer and more intimidating.</p>
+          </div>
+        </>
       )}
 
       {/* A new key after each success clears the field, so the next link starts from empty. */}
@@ -380,34 +413,6 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         key={result?.longLink ?? "first"}
       >
         {result ? <h2>Stretch another link</h2> : null}
-        <div>
-          <label className="field-label" htmlFor="url">
-            Your link
-          </label>
-          <input
-            ref={urlInput}
-            className="field-input"
-            id="url"
-            name="url"
-            // Not `type="url"`: the server decides what counts as a link, and its message says
-            // why, which the browser's own check would replace with a generic one.
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            placeholder="https://example.com"
-            defaultValue={rejection?.values.url ?? ""}
-            aria-invalid={urlError === null ? undefined : true}
-            aria-describedby={urlError === null ? undefined : "url-error"}
-          />
-          {urlError === null ? null : (
-            <p className="field-error" id="url-error">
-              {urlError}
-            </p>
-          )}
-        </div>
-
         <fieldset
           className="flavors"
           aria-describedby={flavorError === null ? undefined : "flavor-error"}
@@ -434,9 +439,36 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
           )}
         </fieldset>
 
-        <button type="submit" className="button" disabled={stretching}>
-          {stretching ? "Stretching" : "Stretch link"}
-        </button>
+        <div className="go">
+          <label className="field-label" htmlFor="url">
+            Your link
+          </label>
+          <input
+            ref={urlInput}
+            className="field-input"
+            id="url"
+            name="url"
+            // Not `type="url"`: the server decides what counts as a link, and its message says
+            // why, which the browser's own check would replace with a generic one.
+            type="text"
+            inputMode="url"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="https://example.com"
+            defaultValue={rejection?.values.url ?? ""}
+            aria-invalid={urlError === null ? undefined : true}
+            aria-describedby={urlError === null ? undefined : "url-error"}
+          />
+          <button type="submit" className="button button-solid" disabled={stretching}>
+            {stretching ? "Stretching" : "Stretch link"}
+          </button>
+          {urlError === null ? null : (
+            <p className="field-error" id="url-error">
+              {urlError}
+            </p>
+          )}
+        </div>
       </Form>
     </main>
   );
