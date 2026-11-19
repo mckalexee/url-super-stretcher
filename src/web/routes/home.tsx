@@ -11,6 +11,7 @@ import { createLink, isHostBlocked, parseTarget } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
+import { Marble } from "#web/marble.tsx";
 import { SHARE_IMAGES, shareMeta } from "#web/share.ts";
 
 import type { Route } from "./+types/home.ts";
@@ -399,6 +400,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 <div className="bar bar-soft">{flavor.sample}</div>
               </div>
             ))}
+            {/* Last, because the stylesheet picks the first bar as the first child. */}
+            <Marble fit="cover" />
           </div>
           <div className="hero">
             <h1>Your link is too short</h1>
@@ -471,6 +474,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
           )}
         </div>
       </Form>
+      {/* A result is on the marble that every page has. The form page's marble is the stage's. */}
+      {result ? <Marble fit="top" /> : null}
     </main>
   );
 }

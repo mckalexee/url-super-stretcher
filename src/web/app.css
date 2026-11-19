@@ -176,13 +176,19 @@ h2 {
   text-decoration: none;
 }
 
-/* Every page except the home page: one column on marble that fades to black. */
+/* Every page except the home page: one column on marble that fades to black. The shade over the
+   marble is a custom property, because the water paints it a second time. The page is its own
+   stacking context, so the water can lie over this background and under everything else. */
 main {
+  --shade: linear-gradient(180deg, rgba(11, 9, 7, 0.72) 0, var(--black) 520px);
+
+  position: relative;
+  isolation: isolate;
   flex: 1;
   width: 100%;
   padding: 96px var(--pad) 48px;
   background:
-    linear-gradient(180deg, rgba(11, 9, 7, 0.72) 0, var(--black) 520px),
+    var(--shade),
     url("./marble.svg") top center / 1600px auto no-repeat;
 }
 
@@ -190,7 +196,61 @@ main > * {
   max-width: 1152px;
 }
 
+/*
+ * The water: a canvas on which src/web/water.ts redraws the marble with its veins swaying. It
+ * lies over the marble of the element that it's in, and under that element's content. The shade
+ * that the element paints over its own marble is painted again over the canvas, so the layer
+ * matches what's under it, and it can appear without a visible change. The layer is transparent
+ * until its canvas has drawn a frame, which leaves the page as it is without the water. Telling
+ * that takes `:has()`, and a browser without it never displays the layer.
+ */
+.marble-water {
+  display: none;
+}
+
+@supports selector(:has(*)) {
+  /* On a page, the layer covers the part of the marble that the shade lets through. */
+  .marble-water {
+    display: block;
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: min(520px, 100%);
+    max-width: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .stage > .marble-water {
+    height: 100%;
+  }
+
+  /* The layer fades in. It goes out at once, because a canvas that lost its picture has nothing
+     to fade from. */
+  .marble-water:has(> canvas[data-ready]) {
+    opacity: 1;
+    transition: opacity 600ms;
+  }
+
+  .marble-water > canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .marble-water::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--shade);
+  }
+}
+
+/* The footer is positioned only to keep its place in the paint order. The page before it is a
+   stacking context, which would otherwise paint over a focus ring that reaches out of the
+   footer. */
 .site-footer {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 24px;
@@ -246,15 +306,22 @@ main.home .stretch-form {
 /*
  * The stage is a picture of the product: a stretched link as a polished gold bar that lies on
  * black marble, seen at an angle. It runs off the left edge and goes out of focus to the right.
- * The markup hides it from assistive technology.
+ * The markup hides it from assistive technology. The shade over its marble is a custom property,
+ * as it is for a page, and the wide layout gives it another value. The stage is its own stacking
+ * context, as a page is, so the water lies over this background and under the bars. `perspective`
+ * has that effect too, and `isolation` says so outright.
  */
 .stage {
+  --shade:
+    linear-gradient(180deg, rgba(11, 9, 7, 0.8) 0, rgba(11, 9, 7, 0.15) 30%),
+    radial-gradient(90% 80% at 30% 60%, rgba(226, 185, 59, 0.18) 0%, rgba(11, 9, 7, 0) 70%);
+
   position: relative;
+  isolation: isolate;
   flex: 1 0 310px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(11, 9, 7, 0.8) 0, rgba(11, 9, 7, 0.15) 30%),
-    radial-gradient(90% 80% at 30% 60%, rgba(226, 185, 59, 0.18) 0%, rgba(11, 9, 7, 0) 70%),
+    var(--shade),
     url("./marble.svg") center / cover;
   perspective: 900px;
   perspective-origin: 78% 22%;
@@ -829,10 +896,7 @@ dd {
   }
 
   .stage {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    margin: 0 calc(-1 * var(--pad));
-    background:
+    --shade:
       linear-gradient(
         90deg,
         rgba(11, 9, 7, 0) 52%,
@@ -840,8 +904,11 @@ dd {
         rgba(11, 9, 7, 0.94) 100%
       ),
       radial-gradient(70% 60% at 22% 26%, rgba(11, 9, 7, 0.9) 0%, rgba(11, 9, 7, 0) 75%),
-      radial-gradient(60% 55% at 26% 82%, rgba(255, 205, 80, 0.24) 0%, rgba(11, 9, 7, 0) 70%),
-      url("./marble.svg") center / cover;
+      radial-gradient(60% 55% at 26% 82%, rgba(255, 205, 80, 0.24) 0%, rgba(11, 9, 7, 0) 70%);
+
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin: 0 calc(-1 * var(--pad));
     perspective: 1300px;
     perspective-origin: 74% 20%;
   }

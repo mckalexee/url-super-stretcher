@@ -18,6 +18,7 @@ import {
 import { LINK_PREFIX } from "#stretch/prefix.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
+import { Marble } from "#web/marble.tsx";
 import { requireIdentityMiddleware } from "#web/middleware.ts";
 import { setMotionPaused, useMotionPaused, usePrefersReducedMotion } from "#web/motion.ts";
 
@@ -161,6 +162,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             again.
           </p>
         ) : null}
+        <Marble fit="top" />
       </main>
     );
   }
@@ -168,6 +170,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main>
       <h1>Error</h1>
       <p>Something went wrong.</p>
+      <Marble fit="top" />
     </main>
   );
 }

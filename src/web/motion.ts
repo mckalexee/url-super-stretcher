@@ -172,8 +172,17 @@ export function setMotionPaused(value: boolean): void {
   publish();
 }
 
+/**
+ * Whether the visitor's system asks for reduced motion right now, for a browser module that isn't
+ * a React component. Like `motionAllowed()`, the answer is false until something has subscribed
+ * to the store, and it's always false on the server. A `watchMotion()` listener runs only after
+ * the store has started, so it can read this to tell a system setting from a pause.
+ */
+export function reducedMotionRequested(): boolean {
+  return reducedMotion;
+}
+
 const pausedSnapshot = () => paused;
-const reducedMotionSnapshot = () => reducedMotion;
 const serverSnapshot = () => false;
 
 /**
@@ -194,5 +203,5 @@ export function useMotionPaused(): boolean {
  * so pair it with `useHydrated()` where a false answer must mean that the system doesn't ask.
  */
 export function usePrefersReducedMotion(): boolean {
-  return useSyncExternalStore(subscribeToMotion, reducedMotionSnapshot, serverSnapshot);
+  return useSyncExternalStore(subscribeToMotion, reducedMotionRequested, serverSnapshot);
 }

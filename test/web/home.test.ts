@@ -101,6 +101,9 @@ describe("GET /", () => {
     const page = await response.text();
     expect(page).not.toContain("Pause motion");
     expect(page).not.toContain("data-motion");
+    // The water over the marble needs the script too, so the server sends no canvas for it.
+    expect(page).not.toContain("<canvas");
+    expect(page).not.toContain("marble-water");
   });
 
   it("doesn't count against the creation rate limit", async () => {
