@@ -2,7 +2,7 @@
 // field and winds around the inside of the page's frame. This module turns numbers into numbers:
 // the line that the text follows, how many characters fit on it, the size that fits a link to a
 // window, and how the link divides into pieces and text elements. It touches no document, so the
-// tests run it alone, and `coil.tsx` does the drawing.
+// tests run it alone, and `coil.ts` does the drawing.
 
 /** A point in the window, in CSS pixels. */
 export interface Point {

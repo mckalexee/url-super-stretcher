@@ -2,7 +2,10 @@
  * Stylesheet for the whole web app. The site is black marble and gold: gold foil headings, a
  * double gold rule around every page, and on the home page a gold bar engraved with a stretched
  * link. docs/design.md records the identity. The fonts ship with the app, so the page calls no
- * third-party origin. Nothing here changes the case of a string, and nothing animates.
+ * third-party origin. Nothing here changes the case of a string. Every animation waits for an
+ * attribute or a class that the script sets only while the motion switch allows motion, so
+ * without the script the page is still. The section "Motion" in docs/design.md covers the switch
+ * and its three layers.
  */
 
 @import "@fontsource-variable/besley/wght.css";

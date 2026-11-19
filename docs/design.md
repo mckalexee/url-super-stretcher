@@ -70,25 +70,125 @@ on black marble, seen at an angle. It runs off the left edge and goes out of foc
   heading. Text over the bar is cream on gold, which nobody can read.
 - The stage is hidden from assistive technology.
 
-The marble is `src/web/marble.svg`, which draws gold veins with turbulence filters.
+A choice of finish swaps the bar at once, and nothing transitions on hover.
+
+The marble is `src/web/marble.svg`, which draws gold veins with turbulence filters. Once motion is
+allowed, the water covers it and the shine crosses the bar. [Motion](#motion) describes both.
 
 ## Motion
 
-The home page has no motion. A choice of finish swaps the gold bar at once, and nothing
-transitions on hover.
+The site moves in three layers: light on the marble, a shine on the gold, and the arrival of a
+result. Every layer is behind one switch, and every layer degrades to the still page that a
+visitor without script sees. The subject is tacky, and the execution is clean:
 
-When a result arrives without a page load, it fades in, and the long link is typed over the
-visitor's own link, one character at a time from the left. The typing starts slow and speeds up,
-on the curve in `src/web/typing.ts`, and every figure counts with it. `useTyping` in
-`src/web/routes/home.tsx` runs it.
+- Between movements, nothing runs except the water. The shine requests frames only while its
+  band moves, and the arrival ends when the link lands.
+- Nothing leaves an inline style behind. An effect that ends returns its elements to what the
+  stylesheet draws.
+- Nothing moves outside the switch.
 
-- The whole link is laid out from the first frame, and it breaks lines at any character, so
-  nothing moves while it types.
-- One clock drives the link and the figures, so they agree in every frame.
-- It runs only while the motion switch in `src/web/motion.ts` allows motion, so it doesn't run
-  without the script, for a visitor who prefers reduced motion, or on a paused page.
+### The switch
 
-To change it, capture frames across its whole duration and look at them. A screenshot of the last frame doesn't show motion.
+`src/web/motion.ts` decides whether the page may move. Motion is allowed only after hydration,
+while the visitor's system doesn't ask for reduced motion, and while the visitor hasn't paused
+it. While it's allowed, the switch sets `data-motion="on"` on `<html>`.
+
+- Put motion CSS under `:root[data-motion="on"]` inside
+  `@media (prefers-reduced-motion: no-preference)`.
+- In a component, read the switch with `useMotionAllowed()`. In a module that isn't a component,
+  follow it with `watchMotion()`.
+- The footer control in `src/web/root.tsx`, **Pause motion** and **Resume motion**, sets the
+  pause, and the browser's storage keeps it for later pages and visits. The control renders only
+  after hydration, and not at all when the system asks for reduced motion.
+- Without script, the page is still and whole: the server sends no canvas, no `data-motion`, and
+  no control.
+
+### Light on the marble
+
+A WebGL2 canvas over the still marble draws caustics, the net of light on the floor of a pool,
+in gold on black. `src/web/water.ts` draws it, and `Marble` in `src/web/marble.tsx` mounts it
+after hydration on every page that shows marble.
+
+- The look is `SPEED`, `SCALE`, and `STRENGTH` at the top of `water.ts`, at 0.25, 0.85, and 0.65,
+  with the wave and net tables under them. The owner chose them in the lab,
+  `design/motion/water.html`, where the preset `chosen` loads them.
+- The water takes no pointer input. Don't add ripples that follow the pointer: the owner chose the
+  look without them.
+- It aims for 60 frames a second. A device that can't keep up drops to 30, and then to a lower
+  resolution. It doesn't step back up.
+- The page pays for WebGL only once motion is allowed. Every failure, such as a context that
+  can't be created or a shader that doesn't compile, leaves the still marble, `src/web/marble.svg`,
+  which is also what a visitor sees without script or with reduced motion. A pause holds the
+  frame that's showing.
+
+### The shine
+
+One slanted band of light crosses the window about every 8 to 12 seconds, and each gold element
+shows its own slice of it, so the page reads as one polished surface under one light. A moving
+mouse or pen carries the band, and a resting pointer holds it. A touch screen gets the timed
+crossings only. `src/web/shine.ts` runs it, and the section "The shine" in `src/web/app.css`
+paints it.
+
+- The timing numbers are constants at the top of `shine.ts`. The look's numbers, such as
+  `--shine-lean`, `--shine-band`, and `--shine-band-strength`, are custom properties in the
+  stylesheet's section, and `shine.ts` reads the ones that its geometry needs.
+- The gold is found by selector, so the markup carries nothing for the shine. To add a gold
+  element, add it to a selector in `shine.ts`.
+- On the gold bar, the band is worked out in the bar's perspective, so its slice lines up with
+  the flat gold around it.
+- A browser that lacks a feature that the shine needs keeps the still gold.
+
+### A result's arrival
+
+After a stretch without a page load, the long link arrives in one of two ways.
+`src/web/routes/home.tsx` decides which.
+
+- **The coil.** From the home page's form, on a window at least 900px wide that holds the whole
+  home page without scrolling, the long link types
+  over the visitor's link in the field, runs out of the field, and coils around the inside of the
+  page's gold frame. The result then takes the home page's place, and the link flies into the
+  result's box row by row. `src/web/coil.ts` draws it, `src/web/coil-geometry.ts` holds its
+  arithmetic, and the section "The coil" in `app.css` styles it. The owner approved the
+  prototype, `design/motion/coil.html`.
+- **The typing.** When the coil doesn't play, for example on a narrow window, from the form under
+  a result, or when the link doesn't fit the coil, the result fades in and the long link types over
+  the visitor's link in the result's box. `useTyping` in `home.tsx` runs it.
+
+Both type on the curve in `src/web/typing.ts`, which starts slow and speeds up. The whole link is
+laid out from the first frame and breaks lines at any character, so nothing shifts while it
+types, and one clock drives the link and the figures, so they agree in every frame. The coil's
+timing and sizes are constants at the top of `coil.ts`, and the fades are custom properties in
+"The coil". A pause in the middle sends the link to rest for good. The coil also drops to the
+result at rest on a hidden tab, a resize, or a failure.
+
+### Change the motion
+
+- **Show options first.** The owner judges motion by eye. Before you build a new look or motion
+  into the app, put a live lab page with a few variants in `design/motion/` and let the owner
+  pick. A description doesn't predict how a look reads: the first water look was built into the
+  app from one, and the owner rejected it on sight.
+- **No view transitions.** Don't use browser view transitions or a shared-element morph. A morph
+  crops the boxes it moves into half-boxes, and the owner rejected it.
+- **Keep it behind the switch.** A new effect follows `src/web/motion.ts`, stops when the switch
+  turns off, and leaves the still page whole when it fails.
+- **Capture the whole duration.** To change an animation, capture frames across its whole
+  duration and look at them. A screenshot of the last frame doesn't show motion. The labs take a
+  query parameter that draws one frozen frame: `time=` in `water.html`, and `t=` and `f=` in
+  `coil.html`.
+- **Check on a real display.** Headless Chrome reports 60 Hz, and the owner's display runs at
+  120 Hz, so frame pacing and smoothness need a look on real hardware.
+
+### Animation skills
+
+Five animation skills are vendored in `.claude/skills/`. This document wins where a skill
+disagrees with it.
+
+- `animate`: deciding whether something should move, and choosing its properties, curve, and
+  duration.
+- `choreograph`: several elements that move together, such as the coil's finale.
+- `animation-performance`: a dropped frame, or a choice of property or of CSS against script.
+- `review-animations`: a critique of motion that you've built, before you show it to the owner.
+- `vercel-react-view-transitions`: reference only. The site doesn't use view transitions.
 
 ## Share images
 
@@ -161,5 +261,6 @@ The other failures describe the skill's kit and not a defect:
   purpose.
 - `focus-ring` and `focus-visible` look for a ring on the radio button. The ring is on the whole
   finish.
-- `hero-enter` and `moment-none` ask for motion that the home page doesn't have.
+- `hero-enter` and `moment-none` ask for the kit's entrance and its moment. The site's motion is
+  its own, in [Motion](#motion).
 - `copy-fact` and the other copy checks don't apply. [copy.md](copy.md) decides the copy.
