@@ -197,12 +197,13 @@ main > * {
 }
 
 /*
- * The water: a canvas on which src/web/water.ts redraws the marble with its veins swaying. It
- * lies over the marble of the element that it's in, and under that element's content. The shade
- * that the element paints over its own marble is painted again over the canvas, so the layer
- * matches what's under it, and it can appear without a visible change. The layer is transparent
- * until its canvas has drawn a frame, which leaves the page as it is without the water. Telling
- * that takes `:has()`, and a browser without it never displays the layer.
+ * The water: a canvas on which src/web/water.ts draws the marble's gold veins as moving light.
+ * It lies over the marble of the element that it's in, and under that element's content, and it
+ * covers the marble wherever the element shows it, so the still veins never show under the
+ * moving ones. The shade that the element paints over its own marble is painted again over the
+ * canvas, so the layer is shaded as the marble under it is. The layer is transparent until its
+ * canvas has drawn a frame, which leaves the page as it is without the water. Telling that
+ * takes `:has()`, and a browser without it never displays the layer.
  */
 .marble-water {
   display: none;

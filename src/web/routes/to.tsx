@@ -216,7 +216,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
       <main>
         <h1>Link removed</h1>
         <p>This link was removed after an abuse report.</p>
-        <Marble fit="top" />
+        <Marble />
       </main>
     );
   }
@@ -233,7 +233,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
         <p className="journey">
           <a href={loaderData.report}>Report a problem with this link</a>
         </p>
-        <Marble fit="top" />
+        <Marble />
       </main>
     );
   }
@@ -269,7 +269,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
       <p className="journey">
         This link is {numberFormat.format(loaderData.length)} characters long.
       </p>
-      <Marble fit="top" />
+      <Marble />
     </main>
   );
 }

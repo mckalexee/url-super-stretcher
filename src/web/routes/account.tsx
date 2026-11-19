@@ -40,7 +40,7 @@ export default function Account({ loaderData }: Route.ComponentProps) {
           set <code>WEB_ACCESS</code> to <code>private</code>.
         </p>
       )}
-      <Marble fit="top" />
+      <Marble />
     </main>
   );
 }

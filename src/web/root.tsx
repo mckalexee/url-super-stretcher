@@ -162,7 +162,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             again.
           </p>
         ) : null}
-        <Marble fit="top" />
+        <Marble />
       </main>
     );
   }
@@ -170,7 +170,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main>
       <h1>Error</h1>
       <p>Something went wrong.</p>
-      <Marble fit="top" />
+      <Marble />
     </main>
   );
 }

@@ -401,7 +401,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
               </div>
             ))}
             {/* Last, because the stylesheet picks the first bar as the first child. */}
-            <Marble fit="cover" />
+            <Marble />
           </div>
           <div className="hero">
             <h1>Your link is too short</h1>
@@ -475,7 +475,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         </div>
       </Form>
       {/* A result is on the marble that every page has. The form page's marble is the stage's. */}
-      {result ? <Marble fit="top" /> : null}
+      {result ? <Marble /> : null}
     </main>
   );
 }
