@@ -196,10 +196,22 @@ main > * {
   font-size: 0.8125rem;
 }
 
+/* A link that stands alone is 44px tall to a finger. The padding adds the height and the margin
+   takes it back, so the text stays where it was. */
+.site-name,
+.site-footer a,
+.result-actions a:not(.button) {
+  display: inline-block;
+  padding-block: 13px;
+  margin-block: -13px;
+}
+
 /* Home page */
 
+/* A column, so that the stage takes the height that a tall window leaves over. */
 main.home {
-  display: block;
+  display: flex;
+  flex-direction: column;
   padding: 0;
   background: none;
 }
@@ -220,7 +232,7 @@ main.home .stretch-form {
  */
 .stage {
   position: relative;
-  height: 310px;
+  flex: 1 0 310px;
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(11, 9, 7, 0.8) 0, rgba(11, 9, 7, 0.15) 30%),
@@ -235,7 +247,7 @@ main.home .stretch-form {
   display: none;
   position: absolute;
   left: -150px;
-  top: 80px;
+  top: calc(50% - 75px);
   width: 1500px;
   height: 286px;
   transform-origin: 0 50%;
@@ -715,9 +727,11 @@ main > p.destination-host {
   font-variant-numeric: tabular-nums;
 }
 
-/* A button that reads as a link, for an action that isn't the main one. */
+/* A button that reads as a link, for an action that isn't the main one. The padding and the
+   margin make it 44px tall to a finger without moving the line it's in. */
 .link-button {
-  padding: 0;
+  margin: -10px 0;
+  padding: 10px 0;
   border: 0;
   background: none;
   color: var(--gold);
@@ -791,7 +805,7 @@ dd {
   main.home {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: minmax(560px, calc(100vh - 196px)) auto;
+    grid-template-rows: minmax(440px, calc(100vh - 196px)) auto;
     column-gap: 24px;
     padding: 0 var(--pad);
   }
@@ -799,7 +813,6 @@ dd {
   .stage {
     grid-column: 1 / -1;
     grid-row: 1;
-    height: auto;
     margin: 0 calc(-1 * var(--pad));
     background:
       linear-gradient(
@@ -817,8 +830,7 @@ dd {
 
   .rig {
     left: -300px;
-    top: auto;
-    bottom: -185px;
+    top: max(366px, calc(100% - 285px));
     width: 2100px;
     height: 470px;
     transform: rotateZ(-9deg) rotateY(56deg);
