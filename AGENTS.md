@@ -96,6 +96,7 @@ smaller model never writes it, and the owner sees new copy before it's applied.
 Topic guides:
 
 - [docs/copy.md](docs/copy.md): the deadpan voice, who writes copy, and the rules for it.
+- [docs/design.md](docs/design.md): the site's look, its typefaces, and its colors.
 
 - [docs/deploy.md](docs/deploy.md): secrets, Previews, the API token, and Renovate.
 - [docs/testing.md](docs/testing.md): the test runtime and helpers.

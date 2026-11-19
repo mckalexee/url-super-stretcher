@@ -169,7 +169,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
         An anonymous visitor created this link. Check the destination before you continue.
       </p>
       <div className="result-actions">
-        <a className="button button-primary" href={loaderData.url} rel="noreferrer nofollow">
+        <a className="button button-solid" href={loaderData.url} rel="noreferrer nofollow">
           Continue
         </a>
         <a href={loaderData.report}>Report this link</a>

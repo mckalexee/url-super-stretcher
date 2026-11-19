@@ -90,6 +90,7 @@ required, because `pnpm deploy` is a built-in pnpm command.
 - [docs/abuse.md](docs/abuse.md): the abuse protections, and how to take a link down, restore it,
   or ban a hostname.
 - [docs/copy.md](docs/copy.md): the voice of the site's copy and the rules for writing it.
+- [docs/design.md](docs/design.md): the site's look, its typefaces, and its colors.
 
 - [docs/web.md](docs/web.md): the React Router app, identity in loaders, public mode, and the
   Cloudflare Access applications.

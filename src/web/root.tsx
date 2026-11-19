@@ -74,7 +74,6 @@ export function Layout({ children }: { children: ReactNode }) {
             URL Super Stretcher
           </Link>
         </header>
-        <div className="tape tape-strip" aria-hidden="true" />
         {children}
         {abuseEmail ? (
           <footer className="site-footer">
