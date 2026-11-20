@@ -1,7 +1,7 @@
 // Root route of the web app. It owns the HTML document shell, the site header and footer, the
 // stylesheet, the identity gate that keeps private routes private, and the error page that every
 // route renders inside.
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import {
   type ErrorResponse,
   isRouteErrorResponse,
@@ -17,7 +17,11 @@ import {
 
 import { LINK_PREFIX } from "#stretch/prefix.ts";
 import { cloudflareContext } from "#web/context.ts";
+import { useHydrated } from "#web/hydrated.ts";
+import { Marble } from "#web/marble.tsx";
 import { requireIdentityMiddleware } from "#web/middleware.ts";
+import { setMotionPaused, useMotionPaused, usePrefersReducedMotion } from "#web/motion.ts";
+import { startShine } from "#web/shine.ts";
 
 import type { Route } from "./+types/root.ts";
 
@@ -54,11 +58,34 @@ export function headers({ errorHeaders }: Route.HeadersArgs) {
 /** Loads the site's stylesheet on every page, including the error page. */
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
+// The footer control that pauses and resumes motion. Its hooks also start the motion store on
+// every page, including the error page, so the stylesheet's switch is set even where no other
+// component asks about motion. The control needs the script, so it renders only after hydration,
+// and a visitor whose system asks for reduced motion has nothing to pause.
+function MotionControl() {
+  const hydrated = useHydrated();
+  const reducedMotion = usePrefersReducedMotion();
+  const paused = useMotionPaused();
+  if (!hydrated || reducedMotion) {
+    return null;
+  }
+  return (
+    <p>
+      <button type="button" className="link-button" onClick={() => setMotionPaused(!paused)}>
+        {paused ? "Resume motion" : "Pause motion"}
+      </button>
+    </p>
+  );
+}
+
 /** Document shell shared by every route, including error boundaries. */
 export function Layout({ children }: { children: ReactNode }) {
   // The loader doesn't run when the identity gate rejects the request or no route matches, and
   // the footer then goes without the link. The copyright line needs no data, so it's always there.
   const abuseEmail = useRouteLoaderData<typeof loader>("root")?.abuseEmail;
+  // The shine finds the gold on whatever page is showing, so the shell starts it once for all of
+  // them, the error page included.
+  useEffect(() => startShine(), []);
   return (
     <html lang="en">
       <head>
@@ -83,6 +110,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <a href={`mailto:${abuseEmail}`}>Report abuse</a>
             </p>
           ) : null}
+          <MotionControl />
           <p className="site-credit">© 2026 Alex McKenzie</p>
         </footer>
         <ScrollRestoration />
@@ -138,6 +166,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
             again.
           </p>
         ) : null}
+        <Marble />
       </main>
     );
   }
@@ -145,6 +174,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main>
       <h1>Error</h1>
       <p>Something went wrong.</p>
+      <Marble />
     </main>
   );
 }

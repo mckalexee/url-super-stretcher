@@ -63,6 +63,8 @@ Some copy is there to inform or protect a visitor, and it's plain:
 - **The removed page, the blocked page, and the 404 note** are plain.
 - **The copyright line in the footer** is plain: "© 2026 Alex McKenzie". It's the one place that
   the site names a real person, because it credits the owner.
+- **The motion control in the footer** is plain: **Pause motion** and **Resume motion**. It's a
+  functional control, so it says what it does.
 
 Plain copy can still be funny by itself. A link lengthener that answers "URLs longer than 2,048
 characters aren't supported." needs no help.

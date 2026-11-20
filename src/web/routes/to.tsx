@@ -11,6 +11,7 @@ import { resolveLink } from "#stretch/links.ts";
 import { checkReputation } from "#stretch/reputation.ts";
 import { cloudflareContext } from "#web/context.ts";
 import { useHydrated } from "#web/hydrated.ts";
+import { Marble } from "#web/marble.tsx";
 import { SHARE_IMAGES, shareMeta } from "#web/share.ts";
 
 import type { Route } from "./+types/to.ts";
@@ -215,6 +216,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
       <main>
         <h1>Link removed</h1>
         <p>This link was removed after an abuse report.</p>
+        <Marble />
       </main>
     );
   }
@@ -231,6 +233,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
         <p className="journey">
           <a href={loaderData.report}>Report a problem with this link</a>
         </p>
+        <Marble />
       </main>
     );
   }
@@ -266,6 +269,7 @@ export default function StretchedLinkPage({ loaderData }: Route.ComponentProps) 
       <p className="journey">
         This link is {numberFormat.format(loaderData.length)} characters long.
       </p>
+      <Marble />
     </main>
   );
 }

@@ -1,0 +1,233 @@
+<!doctype html>
+<!--
+  Prototype of the coil transition, for judging the motion before the app takes it. The page is
+  a static copy of the home page as the server renders it at a wide window, with the result of
+  one real stretch held in a template until the finale. The site's own stylesheet gives it its
+  look, coil.css adds the transition's styles, and coil.js plays it and documents the query
+  parameters for review. The toolbar in the corner is for review and isn't part of the site.
+  In a window narrower than 900px, the lab plays the phone's variants instead, which the
+  toolbar's menu switches.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Coil transition for a stretched link</title>
+    <link rel="icon" href="../../public/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../../src/web/app.css" />
+    <link rel="stylesheet" href="coil.css" />
+    <script type="module" src="coil.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-name" href="coil.html">URL Super Stretcher</a>
+    </header>
+    <main class="home">
+      <div class="stage" aria-hidden="true">
+        <div class="rig" data-flavor="jargon">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            update-from-the-executive-floor-regarding-upleveling-best-practice-value-streams-to-synergize-blue-sky-alignment-which-in-turn-means-socializing-bleeding-edge-market-opportunities-to-transform-premium-alignment-in-the-in
+          </div>
+          <div class="bar bar-soft">
+            update-from-the-executive-floor-regarding-upleveling-best-practice-value-streams-to-synergize-blue-sky-alignment-which-in-turn-means-socializing-bleeding-edge-market-opportunities-to-transform-premium-alignment-in-the-in
+          </div>
+        </div>
+        <div class="rig" data-flavor="legalese">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            reas-the-user-of-the-device-upon-which-this-link-is-displayed-hereinafter-the-recipient-has-been-selected-to-receive-this-link-at-the-sole-discretion-of-the-sender-and-whereas-the-communication-of-which-this-link-forms-t
+          </div>
+          <div class="bar bar-soft">
+            reas-the-user-of-the-device-upon-which-this-link-is-displayed-hereinafter-the-recipient-has-been-selected-to-receive-this-link-at-the-sole-discretion-of-the-sender-and-whereas-the-communication-of-which-this-link-forms-t
+          </div>
+        </div>
+        <div class="rig" data-flavor="ooo">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            oooooooOoooooooooooooooooooooooooo0oooooooooo0oooooooooooooooooooooooooooooooooooooooooooOooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0oooooooooooooooo0ooooooooooooooooooooooooooooooooooo
+          </div>
+          <div class="bar bar-soft">
+            oooooooOoooooooooooooooooooooooooo0oooooooooo0oooooooooooooooooooooooooooooooooooooooooooOooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0oooooooooooooooo0ooooooooooooooooooooooooooooooooooo
+          </div>
+        </div>
+        <div class="rig" data-flavor="tracking">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            ding?utm_source=confidential-memorandum&amp;utm_medium=executive-briefing&amp;utm_campaign=executive-visibility-program&amp;utm_term=authority&amp;utm_content=full-length-edition&amp;audience_segment=junior-staff&amp;lead_score=under-review&amp;att
+          </div>
+          <div class="bar bar-soft">
+            ding?utm_source=confidential-memorandum&amp;utm_medium=executive-briefing&amp;utm_campaign=executive-visibility-program&amp;utm_term=authority&amp;utm_content=full-length-edition&amp;audience_segment=junior-staff&amp;lead_score=under-review&amp;att
+          </div>
+        </div>
+      </div>
+      <div class="hero">
+        <h1>Your link is too short</h1>
+        <p class="lede">Make your links appear longer and more intimidating.</p>
+      </div>
+      <form class="stretch-form" action="/?index" method="post">
+        <fieldset class="flavors">
+          <legend>Finish</legend>
+          <div class="flavor-list">
+            <label class="flavor"
+              ><input type="radio" name="flavor" checked="" value="jargon" /><span
+                class="flavor-name"
+                >Executive</span
+              ><span class="flavor-description">Language that signals seniority.</span></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="legalese" /><span class="flavor-name"
+                >Legal</span
+              ><span class="flavor-description">Discourages casual clicking.</span></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="ooo" /><span class="flavor-name"
+                >Extended</span
+              ><span class="flavor-description"
+                >A single word that fills the address bar.</span
+              ></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="tracking" /><span class="flavor-name"
+                >Fully loaded</span
+              ><span class="flavor-description"
+                >Lets the recipient know they are being measured.</span
+              ></label
+            >
+          </div>
+        </fieldset>
+        <div class="go">
+          <label class="field-label" for="url">Your link</label
+          ><input
+            class="field-input"
+            id="url"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            placeholder="https://example.com"
+            name="url"
+            value=""
+          /><button type="submit" class="button button-solid">Stretch link</button>
+        </div>
+      </form>
+    </main>
+    <footer class="site-footer">
+      <p><a href="mailto:abuse@jade.email">Report abuse</a></p>
+      <p class="site-credit">© 2026 Alex McKenzie</p>
+    </footer>
+    <template id="result-state">
+      <main>
+        <section class="result" aria-labelledby="result-heading">
+          <div>
+            <h1 id="result-heading" tabindex="-1">Your link is ready</h1>
+            <dl class="figure">
+              <dt>Increase</dt>
+              <dd>5,344%</dd>
+            </dl>
+            <div class="result-actions">
+              <button type="button" class="button button-solid">Copy</button
+              ><output class="copy-status"></output
+              ><a
+                class="button"
+                href="http://localhost:5173/to/as-raised-by-the-chairman-at-the-leadership-offsite-regarding-leveraging-cross-functional-swim-lanes-to-circle-back-on-transformational-returns-by-way-of-upleveling-high-visibility-swim-lanes-to-level-set-high-margin-value-propositions-and-at-the-end-of-the-day-right-sizing-outside-the-box-low-hanging-fruit-to-monetize-sustainable-momentum-with-the-board-watching-closely-benchmarking-mission-critical-paradigm-shifts-to-empower-world-class-value-propositions-as-a-first-step-toward-strategizing-around-outside-the-box-core-competencies-to-operationalize-seamless-verticals-with-a-view-to-blue-skying-next-generation-value-streams-to-reimagine-best-of-breed-growth-and-going-forward-whiteboarding-best-practice-paradigm-shifts-to-accelerate-forward-looking-synergies-while-upleveling-frictionless-mindshare-to-monetize-game-changing-outcomes-while-simultaneously-ideating-around-frictionless-action-items-to-recontextualize-high-margin-roadmaps-while-simultaneously-operationalizing-mission-critical-paradigm-shifts-to-optimize-impactful-alignment-and-going-forward-stress-testing-frictionless-key-learnings-to-capitalize-on-blue-sky-alignment-while-simultaneously-stress-testing-data-driven-key-learnings-to-streamline-strategic-growth-and-from-thirty-thousand-feet-leveraging-performance-based-growth-levers-to-reimagine-end-to-end-shareholder-value-with-a-view-to-pressure-testing-scalable-success-criteria-to-transform-win-win-pain-points-while-upleveling-cross-functional-core-competencies-to-streamline-world-class-takeaways-all-without-sunsetting-client-facing-swim-lanes-to-operationalize-market-ready-takeaways-before-circling-back-and-double-clicking-on-next-generation-key-learnings-to-elevate-world-class-efficiencies-as-a-first-step-toward-right-sizing-results-driven-core-competencies-to-capitalize-on-game-changing-market-share-as-approved-at-the-executive-level-tracked-as-action-item-f7766e8130307c061a856d7164cb3df2"
+                rel="nofollow noreferrer"
+                >Open</a
+              >
+            </div>
+            <table class="report">
+              <caption>
+                Specifications
+              </caption>
+              <tbody>
+                <tr>
+                  <th scope="row">Original length</th>
+                  <td>36 characters</td>
+                </tr>
+                <tr>
+                  <th scope="row">New length</th>
+                  <td>1,960 characters</td>
+                </tr>
+                <tr>
+                  <th scope="row">Characters added</th>
+                  <td>1,924</td>
+                </tr>
+                <tr>
+                  <th scope="row">Posts required to share, at 280 characters each</th>
+                  <td>7</td>
+                </tr>
+                <tr>
+                  <th scope="row">Time to type by hand, at 200 characters per minute</th>
+                  <td>9 min 48 s</td>
+                </tr>
+                <tr>
+                  <th scope="row">Destination</th>
+                  <td>Unchanged</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="long-link" data-testid="long-link">
+            http://localhost:5173/to/as-raised-by-the-chairman-at-the-leadership-offsite-regarding-leveraging-cross-functional-swim-lanes-to-circle-back-on-transformational-returns-by-way-of-upleveling-high-visibility-swim-lanes-to-level-set-high-margin-value-propositions-and-at-the-end-of-the-day-right-sizing-outside-the-box-low-hanging-fruit-to-monetize-sustainable-momentum-with-the-board-watching-closely-benchmarking-mission-critical-paradigm-shifts-to-empower-world-class-value-propositions-as-a-first-step-toward-strategizing-around-outside-the-box-core-competencies-to-operationalize-seamless-verticals-with-a-view-to-blue-skying-next-generation-value-streams-to-reimagine-best-of-breed-growth-and-going-forward-whiteboarding-best-practice-paradigm-shifts-to-accelerate-forward-looking-synergies-while-upleveling-frictionless-mindshare-to-monetize-game-changing-outcomes-while-simultaneously-ideating-around-frictionless-action-items-to-recontextualize-high-margin-roadmaps-while-simultaneously-operationalizing-mission-critical-paradigm-shifts-to-optimize-impactful-alignment-and-going-forward-stress-testing-frictionless-key-learnings-to-capitalize-on-blue-sky-alignment-while-simultaneously-stress-testing-data-driven-key-learnings-to-streamline-strategic-growth-and-from-thirty-thousand-feet-leveraging-performance-based-growth-levers-to-reimagine-end-to-end-shareholder-value-with-a-view-to-pressure-testing-scalable-success-criteria-to-transform-win-win-pain-points-while-upleveling-cross-functional-core-competencies-to-streamline-world-class-takeaways-all-without-sunsetting-client-facing-swim-lanes-to-operationalize-market-ready-takeaways-before-circling-back-and-double-clicking-on-next-generation-key-learnings-to-elevate-world-class-efficiencies-as-a-first-step-toward-right-sizing-results-driven-core-competencies-to-capitalize-on-game-changing-market-share-as-approved-at-the-executive-level-tracked-as-action-item-f7766e8130307c061a856d7164cb3df2
+          </p>
+        </section>
+        <form class="stretch-form again" action="/?index" method="post">
+          <h2>Stretch another link</h2>
+          <fieldset class="flavors">
+            <legend>Finish</legend>
+            <div class="flavor-list">
+              <label class="flavor"
+                ><input type="radio" name="flavor" checked="" value="jargon" /><span
+                  class="flavor-name"
+                  >Executive</span
+                ><span class="flavor-description">Language that signals seniority.</span></label
+              ><label class="flavor"
+                ><input type="radio" name="flavor" value="legalese" /><span class="flavor-name"
+                  >Legal</span
+                ><span class="flavor-description">Discourages casual clicking.</span></label
+              ><label class="flavor"
+                ><input type="radio" name="flavor" value="ooo" /><span class="flavor-name"
+                  >Extended</span
+                ><span class="flavor-description"
+                  >A single word that fills the address bar.</span
+                ></label
+              ><label class="flavor"
+                ><input type="radio" name="flavor" value="tracking" /><span class="flavor-name"
+                  >Fully loaded</span
+                ><span class="flavor-description"
+                  >Lets the recipient know they are being measured.</span
+                ></label
+              >
+            </div>
+          </fieldset>
+          <div class="go">
+            <label class="field-label" for="url">Your link</label
+            ><input
+              class="field-input"
+              id="url"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="https://example.com"
+              name="url"
+              value=""
+            /><button type="submit" class="button button-solid">Stretch link</button>
+          </div>
+        </form>
+      </main>
+    </template>
+    <svg class="coil-overlay" aria-hidden="true">
+      <defs><path id="coil-path" /></defs>
+    </svg>
+    <div class="review-bar" role="group" aria-label="Review controls">
+      <button type="button" data-review="play">Play</button>
+      <button type="button" data-review="reset">Reset</button>
+      <select data-review="variant" aria-label="Phone variant">
+        <option value="tangle">Tangle</option>
+        <option value="snake">Snake</option>
+        <option value="vortex">Vortex</option>
+      </select>
+      <output data-review="readout"></output>
+    </div>
+  </body>
+</html>

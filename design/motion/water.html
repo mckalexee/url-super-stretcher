@@ -1,0 +1,145 @@
+<!doctype html>
+<!--
+  Lab for the caustics behind the home page, for choosing a look by eye before the app takes
+  one. The page is a static copy of the home page as the server renders it at a wide window. The
+  site's own stylesheet gives it its look, and the stage holds the app's own layer for a canvas
+  over the marble. water.js draws the looks on that canvas and documents the query parameters,
+  and water.css adds the fonts and the toolbar. The toolbar in the corner is for review and isn't
+  part of the site.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Caustics lab for the home page</title>
+    <link rel="icon" href="../../public/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../../src/web/app.css" />
+    <link rel="stylesheet" href="water.css" />
+    <script type="module" src="water.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-name" href="water.html">URL Super Stretcher</a>
+    </header>
+    <main class="home">
+      <div class="stage" aria-hidden="true">
+        <div class="rig" data-flavor="jargon">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            update-from-the-executive-floor-regarding-upleveling-best-practice-value-streams-to-synergize-blue-sky-alignment-which-in-turn-means-socializing-bleeding-edge-market-opportunities-to-transform-premium-alignment-in-the-in
+          </div>
+          <div class="bar bar-soft">
+            update-from-the-executive-floor-regarding-upleveling-best-practice-value-streams-to-synergize-blue-sky-alignment-which-in-turn-means-socializing-bleeding-edge-market-opportunities-to-transform-premium-alignment-in-the-in
+          </div>
+        </div>
+        <div class="rig" data-flavor="legalese">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            reas-the-user-of-the-device-upon-which-this-link-is-displayed-hereinafter-the-recipient-has-been-selected-to-receive-this-link-at-the-sole-discretion-of-the-sender-and-whereas-the-communication-of-which-this-link-forms-t
+          </div>
+          <div class="bar bar-soft">
+            reas-the-user-of-the-device-upon-which-this-link-is-displayed-hereinafter-the-recipient-has-been-selected-to-receive-this-link-at-the-sole-discretion-of-the-sender-and-whereas-the-communication-of-which-this-link-forms-t
+          </div>
+        </div>
+        <div class="rig" data-flavor="ooo">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            oooooooOoooooooooooooooooooooooooo0oooooooooo0oooooooooooooooooooooooooooooooooooooooooooOooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0oooooooooooooooo0ooooooooooooooooooooooooooooooooooo
+          </div>
+          <div class="bar bar-soft">
+            oooooooOoooooooooooooooooooooooooo0oooooooooo0oooooooooooooooooooooooooooooooooooooooooooOooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo0oooooooooooooooo0ooooooooooooooooooooooooooooooooooo
+          </div>
+        </div>
+        <div class="rig" data-flavor="tracking">
+          <div class="bar-shadow"></div>
+          <div class="bar bar-sharp">
+            ding?utm_source=confidential-memorandum&amp;utm_medium=executive-briefing&amp;utm_campaign=executive-visibility-program&amp;utm_term=authority&amp;utm_content=full-length-edition&amp;audience_segment=junior-staff&amp;lead_score=under-review&amp;att
+          </div>
+          <div class="bar bar-soft">
+            ding?utm_source=confidential-memorandum&amp;utm_medium=executive-briefing&amp;utm_campaign=executive-visibility-program&amp;utm_term=authority&amp;utm_content=full-length-edition&amp;audience_segment=junior-staff&amp;lead_score=under-review&amp;att
+          </div>
+        </div>
+        <div class="marble-water" aria-hidden="true"><canvas></canvas></div>
+      </div>
+      <div class="hero">
+        <h1>Your link is too short</h1>
+        <p class="lede">Make your links appear longer and more intimidating.</p>
+      </div>
+      <form class="stretch-form" action="/?index" method="post">
+        <fieldset class="flavors">
+          <legend>Finish</legend>
+          <div class="flavor-list">
+            <label class="flavor"
+              ><input type="radio" name="flavor" checked="" value="jargon" /><span
+                class="flavor-name"
+                >Executive</span
+              ><span class="flavor-description">Language that signals seniority.</span></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="legalese" /><span class="flavor-name"
+                >Legal</span
+              ><span class="flavor-description">Discourages casual clicking.</span></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="ooo" /><span class="flavor-name"
+                >Extended</span
+              ><span class="flavor-description"
+                >A single word that fills the address bar.</span
+              ></label
+            ><label class="flavor"
+              ><input type="radio" name="flavor" value="tracking" /><span class="flavor-name"
+                >Fully loaded</span
+              ><span class="flavor-description"
+                >Lets the recipient know they are being measured.</span
+              ></label
+            >
+          </div>
+        </fieldset>
+        <div class="go">
+          <label class="field-label" for="url">Your link</label
+          ><input
+            class="field-input"
+            id="url"
+            type="text"
+            inputmode="url"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            placeholder="https://example.com"
+            name="url"
+            value=""
+          /><button type="submit" class="button button-solid">Stretch link</button>
+        </div>
+      </form>
+    </main>
+    <footer class="site-footer">
+      <p><a href="mailto:abuse@jade.email">Report abuse</a></p>
+      <p class="site-credit">© 2026 Alex McKenzie</p>
+    </footer>
+    <div class="review-bar" role="group" aria-label="Review controls" hidden>
+      <div class="review-row">
+        <button type="button" data-look="caustics" aria-pressed="false">Caustics</button>
+        <button type="button" data-look="surface" aria-pressed="false">Water over marble</button>
+      </div>
+      <div class="review-row" data-review="presets">
+        <span>Preset</span>
+        <button type="button" data-preset="chosen" aria-pressed="false">Chosen</button>
+        <button type="button" data-preset="pool" aria-pressed="false">Pool</button>
+        <button type="button" data-preset="ocean" aria-pressed="false">Ocean</button>
+      </div>
+      <label class="review-slider"
+        ><span>Speed</span><input type="range" data-slider="speed" /><output></output
+      ></label>
+      <label class="review-slider"
+        ><span>Scale</span><input type="range" data-slider="scale" /><output></output
+      ></label>
+      <label class="review-slider"
+        ><span>Strength</span><input type="range" data-slider="strength" /><output></output
+      ></label>
+      <div class="review-row">
+        <label><input type="checkbox" data-review="fps60" /> 60 fps</label>
+        <button type="button" data-review="reset">Reset</button>
+      </div>
+      <output class="review-readout" data-review="readout"></output>
+      <pre class="review-error" data-review="error" hidden></pre>
+    </div>
+  </body>
+</html>

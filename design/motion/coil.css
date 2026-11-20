@@ -1,0 +1,301 @@
+/*
+ * Styles for the coil prototype, a standalone page that shows one transition: a submitted link
+ * becomes the long link, runs out of its field, and coils around the page, and then the page
+ * changes to the result and the link flies into the result's well. The page's look comes from
+ * src/web/app.css, which coil.html links, so this file holds only what the transition adds:
+ * the fonts, which the app's bundler normally resolves, the text on the coil, the rows that fly
+ * from the coil into the result, and a review toolbar that isn't part of the site.
+ */
+
+@font-face {
+  font-family: "Besley Variable";
+  font-weight: 400 900;
+  src: url("../../node_modules/@fontsource-variable/besley/files/besley-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-weight: 100 800;
+  src: url("../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+:root {
+  /* coil.js sets the duration again for the `slow` parameter and for a still image. */
+  --coil-fade: 300ms;
+  /* How far everything that the coil runs over steps back, and how far the marble and the
+     gold bar do. The link is then the brightest thing on the page. */
+  --coil-dim: 0.08;
+  --coil-stage-dim: 0.4;
+}
+
+/*
+ * Making room. The coil's inner lanes cross the content, so when the head leaves the field,
+ * everything on the home page fades except the link itself, which is drawn in the overlay. The
+ * band fades whole, with the field's box and the button in it, because the dark outline of the
+ * coil's letters looks dirty on a gold border or on polished gold. Only `opacity` changes.
+ */
+.site-header,
+.site-footer,
+.home .stage,
+.home .hero,
+.home .flavors,
+.home .go {
+  transition: opacity var(--coil-fade) ease;
+}
+
+.coil-dim .site-header,
+.coil-dim .site-footer,
+.coil-dimmed .hero,
+.coil-dimmed .flavors,
+.coil-dimmed .go {
+  opacity: var(--coil-dim);
+}
+
+.coil-dimmed .stage {
+  opacity: var(--coil-stage-dim);
+}
+
+/* Everything that fades has its compositor layer from the start of a run, so the browser
+   doesn't make and paint six layers in the frame where the fade starts. coil.js takes the
+   class off when the run ends. */
+.coil-running .site-header,
+.coil-running .site-footer,
+.coil-running .home .stage,
+.coil-running .home .hero,
+.coil-running .home .flavors,
+.coil-running .home .go {
+  will-change: opacity;
+}
+
+/* While the home page fades out over the result, it keeps its place and takes no space, so
+   the result is laid out where it will stay. */
+.home.coil-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/*
+ * The finale is set up while the finished coil holds still, and the page is then already as
+ * tall as the result. Until the motion starts, the page's frame and the footer stay where the
+ * home page had them, at the window's edge, so nothing is seen to change.
+ */
+body.coil-held::before {
+  bottom: auto;
+  height: calc(100vh - 24px);
+}
+
+.coil-held .site-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/*
+ * The result during the finale. The stylesheet makes a page its own stacking context, so the
+ * rows that fly into the well are inside the result: over its background and the well, and
+ * under its heading, figures, buttons, and table. The result can't fade in as one layer with
+ * the rows in it, so its parts fade together, and its background is drawn by an element of its
+ * own under everything, with the values that coil.js copies from the result.
+ */
+main.coil-arriving {
+  background: none;
+}
+
+.coil-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  max-width: none;
+  pointer-events: none;
+}
+
+.coil-arriving .result > div {
+  position: relative;
+  z-index: 2;
+}
+
+/* The result's parts get their compositor layers while the finished coil holds still, and
+   the browser paints them then, so that work isn't in the frame where the fade starts.
+   coil.js takes the class off when the fade ends. */
+.coil-fading > .coil-backdrop,
+.coil-fading > form,
+.coil-fading .result > * {
+  will-change: opacity;
+}
+
+/*
+ * The coil is drawn in one SVG that covers the window, over the page and its frame. It has its
+ * own compositor layer, so a new piece of text repaints a small part of this layer and nothing
+ * of the blurred, masked gold bar under it.
+ */
+.coil-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.coil-overlay text {
+  fill: var(--bright);
+}
+
+/* A dark outline under each letter, so the text reads over the gold bar and over another lane's
+   letters at a corner. Text inside the field goes without it, because the outline would cut
+   into the letters that the visitor's link still shows there. */
+.coil-overlay .coil-halo {
+  paint-order: stroke;
+  stroke: var(--black);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* The newest letters, in the colors of `.long-link-edge`. They are a separate element so the
+   glow filter covers a few letters and not the window. */
+.coil-overlay .coil-edge {
+  fill: #fff;
+  filter: drop-shadow(0 0 5px #ffcf4d);
+}
+
+/*
+ * Phone mode. The text sits centered on its path, so a lane's letters are as far from the lane
+ * inside as from the lane outside, whichever way up they are. A gap is the dark cut that a
+ * newer strand of the tangle makes in an older one where it crosses, drawn under the newer
+ * strand's letters. The page's frame is pinned to the screen for the run, so the text runs
+ * inside the frame whatever the scroll, and coil.js lets it go as the finale starts.
+ */
+.coil-overlay.coil-phone text {
+  dominant-baseline: central;
+}
+
+.coil-overlay .coil-gap {
+  fill: none;
+  stroke: var(--black);
+  stroke-linecap: round;
+}
+
+body.coil-pinned::before {
+  position: fixed;
+}
+
+/*
+ * The well on the result. A break after any character makes its rows a strict grid, so the row
+ * that a character lands in is known before the result is on the page.
+ */
+.long-link {
+  line-break: anywhere;
+  word-break: break-all;
+}
+
+/* The well holds the whole link from the first frame, unseen, so it never changes size. Its
+   own text shows when the last row has landed on it. */
+.long-link.coil-waiting {
+  color: transparent;
+}
+
+/*
+ * The rows in flight. Each is a line of text that sits exactly on its place in the well, in
+ * the well's font, which coil.js copies to this element, and a transform carries it there from
+ * the coil. The element covers the result and clips its lines, so a turning line never gives
+ * the page a scroll bar.
+ */
+.coil-flyers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--bright);
+}
+
+/* A line in flight has the same dark outline as the text on the coil, so it reads over the
+   marble. The outline is the color of the well. Each line has its compositor layer from the
+   moment it's made, while the finished coil holds still, so the browser doesn't make and paint
+   every layer in the frame where the flights start. A line that has landed gives its layer
+   up and drops its outline, so the line is drawn exactly as the well's own text will be, and
+   it's drawn over the lines still in flight, so a passing line and its outline never cut into
+   text at rest. */
+.coil-flyer {
+  position: absolute;
+  white-space: pre;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 4px var(--well);
+  will-change: transform, opacity;
+}
+
+.coil-flyer.coil-landed {
+  z-index: 1;
+  paint-order: normal;
+  -webkit-text-stroke: 0;
+  will-change: auto;
+}
+
+/*
+ * The review toolbar. It's in a plain system font on a light panel, so nobody takes it for part
+ * of the page. It sits inside the lanes that the coil runs in.
+ */
+.review-bar {
+  position: fixed;
+  top: 72px;
+  right: 72px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 5px;
+  border-radius: 6px;
+  background: #f1f1f1;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  color: #1a1a1a;
+  font:
+    12px/1.3 system-ui,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.review-bar[hidden] {
+  display: none;
+}
+
+/* The variants are the phone's, so a wide window doesn't offer them. */
+@media (min-width: 900px) {
+  .review-bar select {
+    display: none;
+  }
+}
+
+/* A phone has no room inside the lanes, so the toolbar sits over the top of the screen. */
+@media (max-width: 899px) {
+  .review-bar {
+    top: 4px;
+    right: 4px;
+    left: 4px;
+    flex-wrap: wrap;
+  }
+}
+
+.review-bar select,
+.review-bar button {
+  padding: 3px 10px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.review-bar button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

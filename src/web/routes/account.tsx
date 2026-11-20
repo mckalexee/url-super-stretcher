@@ -2,6 +2,7 @@
 // of a private route in the web app. It isn't in the root route's list of public paths, so the
 // identity gate runs before its loader.
 import { identityContext } from "#web/context.ts";
+import { Marble } from "#web/marble.tsx";
 
 import type { Route } from "./+types/account.ts";
 
@@ -39,6 +40,7 @@ export default function Account({ loaderData }: Route.ComponentProps) {
           set <code>WEB_ACCESS</code> to <code>private</code>.
         </p>
       )}
+      <Marble />
     </main>
   );
 }

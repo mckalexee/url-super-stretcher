@@ -1,7 +1,7 @@
-// Tests that the Worker server-renders the home page and its form, that the form's action
-// stretches a link or re-renders the form with a message, that it turns away blocklisted and
-// banned destinations and clients over the rate limit, that responses carry the security headers,
-// and that an unknown path renders the error page.
+// Tests that the Worker server-renders the home page and its form, that the page is still until
+// its script runs, that the form's action stretches a link or re-renders the form with a message,
+// that it turns away blocklisted and banned destinations and clients over the rate limit, that
+// responses carry the security headers, and that an unknown path renders the error page.
 import { env, exports } from "cloudflare:workers";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -94,6 +94,18 @@ describe("GET /", () => {
     expect(await response.text()).toContain('<p class="site-credit">© 2026 Alex McKenzie</p>');
   });
 
+  it("renders no motion control and no motion switch before the script runs", async () => {
+    const response = await exports.default.fetch("http://example.com/");
+
+    // A visitor without JavaScript gets a still page, and no button that does nothing.
+    const page = await response.text();
+    expect(page).not.toContain("Pause motion");
+    expect(page).not.toContain("data-motion");
+    // The water over the marble needs the script too, so the server sends no canvas for it.
+    expect(page).not.toContain("<canvas");
+    expect(page).not.toContain("marble-water");
+  });
+
   it("doesn't count against the creation rate limit", async () => {
     const keys = useFakeLimiter(true);
 
@@ -145,6 +157,21 @@ describe("POST /", () => {
     );
     expect(page).toContain('<th scope="row">New length</th>');
     expect(page).toContain('<th scope="row">Destination</th><td>Unchanged</td>');
+  });
+
+  it("renders the result at rest, with the whole long link as plain text", async () => {
+    const target = "https://example.org/a?b=1";
+    const response = await submitStretchForm({ url: target, flavor: "ooo" });
+
+    const page = await response.text();
+    const longLink = longLinkIn(page);
+    const format = new Intl.NumberFormat("en-US");
+    expect(page).toContain(`<td>${format.format(longLink.length)}<!-- --> characters</td>`);
+    // One text node and no markup for the typing: no span, and nothing of the visitor's link.
+    const escaped = longLink.replaceAll("&", "&amp;");
+    expect(page).toContain(`<p class="long-link" data-testid="long-link">${escaped}</p>`);
+    expect(page).toContain('<section class="result" aria-labelledby="result-heading">');
+    expect(page).not.toContain("long-link-");
   });
 
   it("adds https to a bare hostname", async () => {

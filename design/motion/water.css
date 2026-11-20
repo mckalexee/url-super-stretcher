@@ -1,0 +1,126 @@
+/*
+ * Styles for the caustics lab, a standalone page that draws moving light on the home page's
+ * stage. The page's look comes from src/web/app.css, which water.html links, and so does the
+ * layer that holds the canvas. This file holds only what the lab adds: the fonts, which the
+ * app's bundler normally resolves, and a review toolbar that isn't part of the site.
+ */
+
+@font-face {
+  font-family: "Besley Variable";
+  font-weight: 400 900;
+  src: url("../../node_modules/@fontsource-variable/besley/files/besley-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-weight: 100 800;
+  src: url("../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
+}
+
+/*
+ * The review toolbar. It's in a plain system font on a light panel, so nobody takes it for part
+ * of the page. When wide, it sits in the stage's top right corner, over the part of the marble
+ * that the stage shades to black. When narrow, the stage is a strip at the top of the page, so
+ * the toolbar moves to the bottom of the window and leaves the stage clear.
+ */
+.review-bar {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 30;
+  display: grid;
+  gap: 5px;
+  width: 268px;
+  max-width: calc(100vw - 16px);
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: #f1f1f1;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  color: #1a1a1a;
+  /* The site's dark scheme would otherwise draw the sliders and the boxes dark on this panel. */
+  color-scheme: light;
+  font:
+    12px/1.3 system-ui,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 900px) {
+  .review-bar {
+    top: 22px;
+    right: 22px;
+    bottom: auto;
+  }
+}
+
+.review-bar[hidden],
+.review-bar [hidden] {
+  display: none;
+}
+
+.review-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+
+.review-bar button {
+  padding: 3px 9px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.review-bar button[aria-pressed="true"] {
+  border-color: #1a1a1a;
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.review-bar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A name, the slider, and its value, in columns that line up from one slider to the next. */
+.review-bar label.review-slider {
+  display: grid;
+  grid-template-columns: 52px 1fr 34px;
+}
+
+.review-slider input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.review-slider output {
+  text-align: right;
+}
+
+/* The readout keeps three lines, so the toolbar doesn't change height as the numbers change. */
+.review-readout {
+  min-height: 3.9em;
+  color: #444;
+  white-space: pre-line;
+}
+
+/* A shader that doesn't compile reports here, where the reviewer is looking. */
+.review-error {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  color: #a40000;
+  font:
+    11px/1.3 ui-monospace,
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+}

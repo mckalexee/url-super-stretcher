@@ -2,7 +2,10 @@
  * Stylesheet for the whole web app. The site is black marble and gold: gold foil headings, a
  * double gold rule around every page, and on the home page a gold bar engraved with a stretched
  * link. docs/design.md records the identity. The fonts ship with the app, so the page calls no
- * third-party origin. Nothing here changes the case of a string, and nothing animates.
+ * third-party origin. Nothing here changes the case of a string. Every animation waits for an
+ * attribute or a class that the script sets only while the motion switch allows motion, so
+ * without the script the page is still. The section "Motion" in docs/design.md covers the switch
+ * and its three layers.
  */
 
 @import "@fontsource-variable/besley/wght.css";
@@ -21,7 +24,6 @@
   --placeholder: #c2a557;
   --on-gold: #150d00;
   --engraved: #3a2500;
-  --unlit: #7a6730;
   --alert: #ff9d7e;
 
   --foil: linear-gradient(
@@ -176,13 +178,19 @@ h2 {
   text-decoration: none;
 }
 
-/* Every page except the home page: one column on marble that fades to black. */
+/* Every page except the home page: one column on marble that fades to black. The shade over the
+   marble is a custom property, because the water paints it a second time. The page is its own
+   stacking context, so the water can lie over this background and under everything else. */
 main {
+  --shade: linear-gradient(180deg, rgba(11, 9, 7, 0.72) 0, var(--black) 520px);
+
+  position: relative;
+  isolation: isolate;
   flex: 1;
   width: 100%;
   padding: 96px var(--pad) 48px;
   background:
-    linear-gradient(180deg, rgba(11, 9, 7, 0.72) 0, var(--black) 520px),
+    var(--shade),
     url("./marble.svg") top center / 1600px auto no-repeat;
 }
 
@@ -190,7 +198,62 @@ main > * {
   max-width: 1152px;
 }
 
+/*
+ * The water: a canvas on which src/web/water.ts draws the marble's gold veins as moving light.
+ * It lies over the marble of the element that it's in, and under that element's content, and it
+ * covers the marble wherever the element shows it, so the still veins never show under the
+ * moving ones. The shade that the element paints over its own marble is painted again over the
+ * canvas, so the layer is shaded as the marble under it is. The layer is transparent until its
+ * canvas has drawn a frame, which leaves the page as it is without the water. Telling that
+ * takes `:has()`, and a browser without it never displays the layer.
+ */
+.marble-water {
+  display: none;
+}
+
+@supports selector(:has(*)) {
+  /* On a page, the layer covers the part of the marble that the shade lets through. */
+  .marble-water {
+    display: block;
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: min(520px, 100%);
+    max-width: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .stage > .marble-water {
+    height: 100%;
+  }
+
+  /* The layer fades in. It goes out at once, because a canvas that lost its picture has nothing
+     to fade from. */
+  .marble-water:has(> canvas[data-ready]) {
+    opacity: 1;
+    transition: opacity 600ms;
+  }
+
+  .marble-water > canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .marble-water::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--shade);
+  }
+}
+
+/* The footer is positioned only to keep its place in the paint order. The page before it is a
+   stacking context, which would otherwise paint over a focus ring that reaches out of the
+   footer. */
 .site-footer {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 24px;
@@ -199,15 +262,25 @@ main > * {
   font-size: 0.8125rem;
 }
 
-/* The copyright line keeps the right edge, with or without the abuse link beside it. */
+/* The copyright line keeps the right edge, with or without the abuse link and the motion control
+   beside it. */
 .site-credit {
   margin-left: auto;
 }
 
-/* A link that stands alone is 44px tall to a finger. The padding adds the height and the margin
-   takes it back, so the text stays where it was. */
+/* The motion control is a peer of the abuse link, so it takes the footer's color and weight and
+   not the gold of a link button elsewhere. */
+.site-footer .link-button {
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* A link or a button that stands alone is 44px tall to a finger. The padding adds the height and
+   the margin takes it back, so the text stays where it was. The footer's button is listed with
+   its footer, which outranks the padding and the margin that every link button sets. */
 .site-name,
 .site-footer a,
+.site-footer .link-button,
 .result-actions a:not(.button) {
   display: inline-block;
   padding-block: 13px;
@@ -236,15 +309,22 @@ main.home .stretch-form {
 /*
  * The stage is a picture of the product: a stretched link as a polished gold bar that lies on
  * black marble, seen at an angle. It runs off the left edge and goes out of focus to the right.
- * The markup hides it from assistive technology.
+ * The markup hides it from assistive technology. The shade over its marble is a custom property,
+ * as it is for a page, and the wide layout gives it another value. The stage is its own stacking
+ * context, as a page is, so the water lies over this background and under the bars. `perspective`
+ * has that effect too, and `isolation` says so outright.
  */
 .stage {
+  --shade:
+    linear-gradient(180deg, rgba(11, 9, 7, 0.8) 0, rgba(11, 9, 7, 0.15) 30%),
+    radial-gradient(90% 80% at 30% 60%, rgba(226, 185, 59, 0.18) 0%, rgba(11, 9, 7, 0) 70%);
+
   position: relative;
+  isolation: isolate;
   flex: 1 0 310px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(11, 9, 7, 0.8) 0, rgba(11, 9, 7, 0.15) 30%),
-    radial-gradient(90% 80% at 30% 60%, rgba(226, 185, 59, 0.18) 0%, rgba(11, 9, 7, 0) 70%),
+    var(--shade),
     url("./marble.svg") center / cover;
   perspective: 900px;
   perspective-origin: 78% 22%;
@@ -553,6 +633,20 @@ main.home .flavors {
   align-items: start;
 }
 
+/* A result that arrives without a page load fades in. The script adds the class only to a result
+   that also types, and the switch stops the fade when the visitor pauses motion. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="on"] .result-arriving {
+    animation: result-arrive 250ms ease-out both;
+  }
+}
+
+@keyframes result-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
 .figure {
   margin: 28px 0 0;
 }
@@ -587,7 +681,8 @@ main.home .flavors {
 /*
  * The long link is shown whole and wraps anywhere, because its length is the point. It sits in
  * the same gold-ruled well as the field. One click or tap selects all of it, so copying works
- * without the script.
+ * without the script. A line breaks at the edge of the column, whichever characters are there,
+ * so the typing, which swaps characters, never moves a line break.
  */
 .long-link {
   padding: 22px;
@@ -601,19 +696,38 @@ main.home .flavors {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.7;
-  overflow-wrap: anywhere;
+  line-break: anywhere;
+  word-break: break-all;
   user-select: all;
   -webkit-user-select: all;
 }
 
-/* While the link lights, the part still to come is dim and the lit end glows. */
-.long-link-unlit {
-  color: var(--unlit);
-}
-
+/* While the link types, the typing position glows, the visitor's link that it hasn't reached yet
+   is dim, and the rest of the long link waits in its place without showing. */
 .long-link-edge {
   color: #fff;
   text-shadow: 0 0 10px #ffcf4d;
+}
+
+.long-link-old {
+  color: var(--placeholder);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.long-link-pending {
+  color: transparent;
+}
+
+/* The part of the long link that the visitor's link still covers. It takes no room and shows
+   nothing, and assistive technology still reads it. */
+.long-link-unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .report {
@@ -819,10 +933,7 @@ dd {
   }
 
   .stage {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    margin: 0 calc(-1 * var(--pad));
-    background:
+    --shade:
       linear-gradient(
         90deg,
         rgba(11, 9, 7, 0) 52%,
@@ -830,8 +941,11 @@ dd {
         rgba(11, 9, 7, 0.94) 100%
       ),
       radial-gradient(70% 60% at 22% 26%, rgba(11, 9, 7, 0.9) 0%, rgba(11, 9, 7, 0) 75%),
-      radial-gradient(60% 55% at 26% 82%, rgba(255, 205, 80, 0.24) 0%, rgba(11, 9, 7, 0) 70%),
-      url("./marble.svg") center / cover;
+      radial-gradient(60% 55% at 26% 82%, rgba(255, 205, 80, 0.24) 0%, rgba(11, 9, 7, 0) 70%);
+
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin: 0 calc(-1 * var(--pad));
     perspective: 1300px;
     perspective-origin: 74% 20%;
   }
@@ -948,5 +1062,399 @@ dd {
 
   .again .flavor-list {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* The coil */
+
+/*
+ * The transition after a stretch from the home page, which src/web/coil.ts plays: the long link
+ * types over the visitor's link, runs out of the field, and coils around the page, and then the
+ * result takes the home page's place and the link flies into the well. Every rule here needs a
+ * class that the script adds while the coil plays and takes away when it ends, so a page without
+ * the coil is styled as if this section weren't here.
+ */
+.coil-running {
+  /* The fade of everything that the coil runs over. */
+  --coil-fade: 300ms;
+  /* How far everything that the coil runs over steps back, and how far the marble and the gold
+     bar do. The link is then the brightest thing on the page. */
+  --coil-dim: 0.08;
+  --coil-stage-dim: 0.4;
+}
+
+/*
+ * Making room. The coil's inner lanes cross the content, so when the head leaves the field,
+ * everything on the home page fades except the link itself, which is drawn in the overlay. The
+ * band fades whole, with the field's box and the button in it, because the dark outline of the
+ * coil's letters looks dirty on a gold border or on polished gold. Only `opacity` changes.
+ * Everything that fades has its compositor layer from the start of the coil, so the browser
+ * doesn't make and paint six layers in the frame where the fade starts.
+ */
+.coil-running .site-header,
+.coil-running .site-footer,
+.coil-running .home .stage,
+.coil-running .home .hero,
+.coil-running .home .flavors,
+.coil-running .home .go {
+  transition: opacity var(--coil-fade) ease;
+  will-change: opacity;
+}
+
+.coil-dim .site-header,
+.coil-dim .site-footer,
+.coil-dimmed .hero,
+.coil-dimmed .flavors,
+.coil-dimmed .go {
+  opacity: var(--coil-dim);
+}
+
+.coil-dimmed .stage {
+  opacity: var(--coil-stage-dim);
+}
+
+/* While the home page fades out over the result, it keeps its place and takes no space, so the
+   result is laid out where it will stay. */
+.home.coil-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/*
+ * The finale is set up while the finished coil holds still, and the page is then already as tall
+ * as the result. Until the motion starts, the page's frame and the footer stay where the home page
+ * had them, at the window's edge, so nothing is seen to change.
+ */
+body.coil-held::before {
+  bottom: auto;
+  height: calc(100vh - 24px);
+}
+
+.coil-held .site-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/*
+ * The result during the finale. A page is its own stacking context, so the rows that fly into the
+ * well are inside the result: over its background and the well, and under its heading, figures,
+ * buttons, and table. The result can't fade in as one layer with the rows in it, so its parts fade
+ * together, and its background is drawn by an element of its own under everything, with the
+ * values that the script copies from the result.
+ */
+main.coil-arriving {
+  background: none;
+}
+
+/* The moving marble waits until the link has landed, so its WebGL setup isn't in the finale's
+   frames. It fades in over the still marble afterward, as it does on any result. */
+.coil-arriving > .marble-water {
+  display: none;
+}
+
+.coil-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  max-width: none;
+  pointer-events: none;
+}
+
+.coil-arriving .result > div {
+  position: relative;
+  z-index: 2;
+}
+
+/* The result's parts get their compositor layers while the finished coil holds still, and the
+   browser paints them then, so that work isn't in the frame where the fade starts. */
+.coil-fading > .coil-backdrop,
+.coil-fading > form,
+.coil-fading .result > * {
+  will-change: opacity;
+}
+
+/*
+ * The coil is drawn in one SVG that covers the window, over the page and its frame. It has its own
+ * compositor layer, so a new piece of text repaints a small part of this layer and nothing of the
+ * blurred, masked gold bar under it.
+ */
+.coil-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  will-change: transform;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.coil-overlay text {
+  fill: var(--bright);
+}
+
+/* A dark outline under each letter, so the text reads over the gold bar and over another lane's
+   letters at a corner. Text inside the field goes without it, because the outline would cut into
+   the letters that the visitor's link still shows there. */
+.coil-overlay .coil-halo {
+  paint-order: stroke;
+  stroke: var(--black);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+/* The newest letters, in the colors of `.long-link-edge`. They're a separate element, so the glow
+   filter covers a few letters and not the window. */
+.coil-overlay .coil-edge {
+  fill: #fff;
+  filter: drop-shadow(0 0 5px #ffcf4d);
+}
+
+/*
+ * The tangle, the coil's form where the frame coil doesn't fit. Its text sits centered on its
+ * path, so a strand's letters are as far from the strand on one side as on the other, whichever
+ * way up they are. A gap is the dark cut that a newer strand makes in an older one where it
+ * crosses, drawn under the newer strand's letters. The page's frame is pinned to the screen for
+ * the run, so the text runs inside the frame whatever the scroll, and the script lets it go as the
+ * finale starts.
+ */
+.coil-overlay.coil-phone text {
+  dominant-baseline: central;
+}
+
+.coil-overlay .coil-gap {
+  fill: none;
+  stroke: var(--black);
+  stroke-linecap: round;
+}
+
+body.coil-pinned::before {
+  position: fixed;
+}
+
+/* The well holds the whole link from the first frame, unseen, so it never changes size. Its own
+   text shows when the last row has landed on it. */
+.long-link.coil-waiting {
+  color: transparent;
+}
+
+/*
+ * The rows in flight. Each is a line of text that sits exactly on its place in the well, in the
+ * well's font, which the script copies to this element, and a transform carries it there from the
+ * coil. The element covers the result and clips its lines, so a turning line never gives the page
+ * a scroll bar.
+ */
+.coil-flyers {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-width: none;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--bright);
+}
+
+/* A line in flight has the same dark outline as the text on the coil, so it reads over the
+   marble. The outline is the color of the well. Each line has its compositor layer from the
+   moment it's made, while the finished coil holds still, so the browser doesn't make and paint
+   every layer in the frame where the flights start. A line that has landed gives its layer up and
+   drops its outline, so it's drawn exactly as the well's own text will be, and it's drawn over
+   the lines still in flight, so a passing line and its outline never cut into text at rest. */
+.coil-flyer {
+  position: absolute;
+  white-space: pre;
+  paint-order: stroke fill;
+  -webkit-text-stroke: 4px var(--well);
+  will-change: transform, opacity;
+}
+
+.coil-flyer.coil-landed {
+  z-index: 1;
+  paint-order: normal;
+  -webkit-text-stroke: 0;
+  will-change: auto;
+}
+
+/* The live region that speaks for the page while the coil hides it from assistive technology.
+   It's read, not seen, like `.long-link-unseen`, and it sits at the top of the page, so it never
+   makes the page taller. */
+.coil-status {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The shine */
+
+/*
+ * The property that src/web/shine.ts moves on foil text. `--shine-x` places the band: the
+ * distance from the element's top left corner to the band's centerline, measured across the band.
+ * It's registered, so it has a type that the browser can move smoothly between two values. It
+ * doesn't inherit, so a move restyles one element. Its resting value puts the band out of sight.
+ * A browser that can't register a property gives it no value at all, so every `var()` that
+ * reads it repeats the resting value as its fallback. Without that, the foil rule's background
+ * would be invalid there, and the letters would be transparent.
+ */
+@property --shine-x {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: -9999px;
+}
+
+/*
+ * Light on the gold. One slanted band of light lies across the window, and each gold element
+ * shows the slice of it that's on that element. The band follows a mouse, and every so often it
+ * crosses the window by itself. src/web/shine.ts moves it, and this section paints it. Every
+ * rule here needs the motion switch, so a page without the script, a paused page, and a page for
+ * a visitor who asks for reduced motion are styled as if this section weren't here. While the
+ * band is off the window, each element's slice is parked far outside the element.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* The numbers that set the look. They're tuned by eye. shine.ts reads the lean and the band's
+     width from here, so its geometry always matches what's painted. It reads the lean in degrees
+     and the width in pixels, so keep those units. */
+  :root[data-motion="on"] {
+    /* The color of the light, as red, green, and blue: a warm white, because pure white reads as
+       a hole in the gold. */
+    --shine-light: 255 251 224;
+    /* How far the band leans from vertical. Its top leads. */
+    --shine-lean: 20deg;
+    /* Half the width of the band, measured across it. The bright core is a seventh of this
+       wide. The rest is falloff, and a thin second streak that trails the core. */
+    --shine-band: 48px;
+    /* The opacity of the band's core, from 0 to 1. */
+    --shine-band-strength: 0.92;
+  }
+
+  /*
+   * The band: a narrow bright core with a soft falloff on both sides, and a thin, fainter streak
+   * that trails it, so it reads as a glint on polished metal and not as fog. The stops are shares
+   * of half the band's width, from the trailing edge to the leading one. Each element that paints
+   * the band says which way the gradient runs, where the band's centerline lies along it, and how
+   * far half the band reaches. The gradient is declared on every such element, and not once on
+   * the root, because a custom property takes the values of the properties in it where it's
+   * declared.
+   */
+  :root[data-motion="on"]
+    :is(h1:not(.destination), h2, .site-name, .figure dd, .flavor:has(input:checked) .flavor-name),
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    --shine-band-image: linear-gradient(
+      var(--shine-toward),
+      transparent calc(var(--shine-at) - var(--shine-half)),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.08))
+        calc(var(--shine-at) - var(--shine-half) * 0.74),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.6))
+        calc(var(--shine-at) - var(--shine-half) * 0.66),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.6))
+        calc(var(--shine-at) - var(--shine-half) * 0.6),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.1))
+        calc(var(--shine-at) - var(--shine-half) * 0.5),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.45))
+        calc(var(--shine-at) - var(--shine-half) * 0.2),
+      rgb(var(--shine-light) / var(--shine-band-strength))
+        calc(var(--shine-at) - var(--shine-half) * 0.07),
+      rgb(var(--shine-light) / var(--shine-band-strength))
+        calc(var(--shine-at) + var(--shine-half) * 0.07),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.45))
+        calc(var(--shine-at) + var(--shine-half) * 0.2),
+      rgb(var(--shine-light) / calc(var(--shine-band-strength) * 0.1))
+        calc(var(--shine-at) + var(--shine-half) * 0.5),
+      transparent calc(var(--shine-at) + var(--shine-half))
+    );
+  }
+
+  /*
+   * Foil text. The band is one more layer over the foil, and both show through the letters only,
+   * because the foil rule's `background-clip` covers every layer. The link page's hostname has no
+   * foil, so the selector leaves it out. A move of the band changes `--shine-x`, which repaints
+   * the element.
+   */
+  :root[data-motion="on"]
+    :is(h1:not(.destination), h2, .site-name, .figure dd, .flavor:has(input:checked) .flavor-name) {
+    --shine-toward: calc(90deg + var(--shine-lean));
+    --shine-at: var(--shine-x, -9999px);
+    --shine-half: var(--shine-band);
+
+    background-image: var(--shine-band-image), var(--foil);
+  }
+
+  /*
+   * The polished button and the gold bar paint the band on a pseudo-element, a strip of light
+   * that shine.ts moves with `transform`, which repaints neither surface. The strip lies at the
+   * bottom of its surface's stacking context: over the gold and under the label or the
+   * engraving, which stays readable while the band is on it. Each copy of the bar is a stacking
+   * context already, because it has a mask. The button becomes one here. A disabled button gets
+   * no light.
+   */
+  :root[data-motion="on"] .button-solid:not([disabled]) {
+    position: relative;
+    isolation: isolate;
+    /* `clip` keeps the strip inside the button without making the button a scroll container,
+       and it leaves the glow and the focus ring outside the button alone. The bar already
+       clips. */
+    overflow: clip;
+  }
+
+  /*
+   * A stacking context paints after its neighbors that aren't positioned, so the button's glow
+   * would lie over whatever follows the button in its row and not under it. Positioning what
+   * follows puts that order back within the row. The selector has no specificity, so a rule that
+   * gives one of those boxes a position of its own wins. The rule doesn't reach outside the row.
+   * There, the faint outer edge of the glow now lies over two neighbors that it used to lie
+   * under: the line that follows the row on a link's page, and the big figure before the row on a
+   * result. The difference is at most 3 levels of 255 at rest, and at most 13 while the pointer
+   * is over the button.
+   */
+  :where(:root[data-motion="on"] .button-solid:not([disabled])) ~ * {
+    position: relative;
+  }
+
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /*
+   * The strip: upright, as tall as the surface and as wide as the band, and centered on the
+   * surface's left edge. shine.ts moves it along the surface, and it leans and stretches the
+   * strip as it goes, so the band on the surface has the lean and the width that it has on the
+   * page. On the button that's one lean all the way across. On the gold bar, which is seen in
+   * perspective, it changes along the bar.
+   */
+  :root[data-motion="on"] .button-solid:not([disabled])::after,
+  :root[data-motion="on"] .bar::after {
+    --shine-toward: 90deg;
+    --shine-at: 50%;
+    --shine-half: 50%;
+
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--shine-band) * 2);
+    margin-left: calc(var(--shine-band) * -1);
+    background: var(--shine-band-image);
+    transform: translateX(-9999px);
+  }
+
+  /* The far part of the bar is out of focus, and it fades into the dark. A warm white band reads
+     as gray fog there, so the blurred copy of the bar gets a dimmer band in the gold's own
+     color. The sharp copy keeps the white streak. */
+  :root[data-motion="on"] .bar-soft {
+    --shine-light: 255 236 150;
+    --shine-band-strength: 0.8;
   }
 }
