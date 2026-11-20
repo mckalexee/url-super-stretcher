@@ -1,14 +1,35 @@
 // The coil: the transition that plays after a stretch from the home page. The long link types
-// over the visitor's link in the field, runs out of the field, and spirals clockwise around the
-// inside of the page's gold frame until every character is written. Then, in the finale, the
-// result takes the home page's place and each row of the link flies from the coil into the
-// result's well, where it comes to rest as the well's own text. This module does the drawing
-// and the timing with the Web Animations API and `requestAnimationFrame`, and keeps no state in
-// React, because a frame that changes one text element holds the full frame rate and a render
-// wouldn't. `coil-geometry.ts` holds the arithmetic, and the home route decides when to call
-// this and mounts the result for the finale.
-import { coilLayout, coilPath, coilZones, fitCoil, type CoilFit } from "#web/coil-geometry.ts";
-import type { CoilLayout, Point } from "#web/coil-geometry.ts";
+// over the visitor's link in the field and runs out of the field in one of two forms. The frame
+// coil spirals clockwise around the inside of the page's gold frame, on a wide window that holds
+// the whole home page. The tangle, everywhere else that the coil plays, such as a phone, wanders
+// the screen as one cord that loops and crosses itself and gets smaller as it piles up. Then, in
+// the finale, the result takes the home page's place and each row of the link flies from the coil
+// into the result's well, where it comes to rest as the well's own text.
+//
+// This module does the drawing and the timing with the Web Animations API and
+// `requestAnimationFrame`, and keeps no state in React, because a frame that changes one text
+// element holds the full frame rate and a render wouldn't. `coil-geometry.ts` and `coil-tangle.ts`
+// hold the arithmetic, and the home route decides when to call this and mounts the result for the
+// finale.
+import {
+  coilLayout,
+  coilPath,
+  coilZones,
+  fitCoil,
+  type CoilLayout,
+  type Insets,
+  type Point,
+} from "#web/coil-geometry.ts";
+import {
+  fieldLine,
+  fitTangle,
+  haloFor,
+  hashSeed,
+  planTangle,
+  tanglePoint,
+  type TangleFit,
+  type TangleGap,
+} from "#web/coil-tangle.ts";
 import { watchMotion } from "#web/motion.ts";
 import { typedShare } from "#web/typing.ts";
 
@@ -71,7 +92,25 @@ const EDGE_LENGTH = 10;
 const TAPER_STEPS = 12;
 const TAPER_RUN = 3;
 
-// The coil needs the wide layout, where the field and the button share a row.
+// The distance from the screen's edge to the middle of the tangle's outermost text, in CSS
+// pixels. A letter of 16px reaches about 7px either side of its middle, and its outline 2px more,
+// so the letters stay clear of the fine gold rule, which ends 16px in on a phone. In the wide
+// layout the rule ends 19px in, so the tangle keeps the frame coil's inset there.
+const TANGLE_INSET = 28;
+// How far above the screen's bottom edge the field's box sits when the coil brings it into view.
+const FIELD_MARGIN = 24;
+// The tangle is grown in slices of about this many milliseconds, with the browser free to paint
+// a frame between two slices, so no task runs long enough to stall the page.
+const SLICE_MS = 8;
+// The tangle's finale. The result stacks on a narrow window, so its well starts below the fold,
+// and a camera moves the page: it starts raised, with the well's top edge `CAMERA_TOP` below the
+// top of the screen, so the rows land in view, and lowers to the top of the page as the figures
+// finish counting. `PAN_DELAY_MS` is when it starts to move, and `PAN_EASING` its curve.
+const CAMERA_TOP = 40;
+const PAN_DELAY_MS = 450;
+const PAN_EASING = "cubic-bezier(0.65, 0, 0.35, 1)";
+
+// The frame coil needs the wide layout, where the field and the button share a row.
 const WIDE = "(min-width: 900px)";
 // The overwrite in the field takes one character for one cell of the fixed-width face, which
 // holds only for printable ASCII. A link with anything else types in the result's well instead.
@@ -119,6 +158,12 @@ export interface CoilOptions {
    * at rest synchronously.
    */
   onDropped: () => void;
+  /**
+   * Called when the tangle finds no way to hold the link after it started, while its head is
+   * still in the field. Every trace of the coil is gone, the field shows the visitor's link
+   * again, and the page shows the result synchronously, as it does when the coil doesn't play.
+   */
+  onAbandoned: () => void;
 }
 
 /** A coil that's playing. */
@@ -152,8 +197,62 @@ function supported(): boolean {
   );
 }
 
+// Whether the browser also has what the tangle adds: a channel that runs the slices of its
+// growth between frames, and animations on the page's frame, which is a pseudo-element. A browser
+// that ignored the pseudo-element would move the whole body instead.
+function tangleSupported(): boolean {
+  return (
+    typeof MessageChannel === "function" &&
+    typeof KeyframeEffect !== "undefined" &&
+    "pseudoElement" in KeyframeEffect.prototype
+  );
+}
+
 function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
+}
+
+// The tangle's text is drawn against the screen, so the page mustn't scroll under it. A press
+// skips the coil, so this stops what scrolls without one: a wheel, or a touch that moves.
+function preventScroll(event: Event): void {
+  event.preventDefault();
+}
+
+// How long after a press is released its click may still arrive. A page with a viewport meta
+// tag gets a touch's click without the old double-tap delay, so this only needs to cover a slow
+// frame.
+const CLICK_GUARD_MS = 500;
+
+/**
+ * Swallows the click that ends the press that skipped the coil, which would otherwise act on the
+ * result now under the pointer. Capturing the pointer sends a mouse's click to the body, but a
+ * touch's click still goes to the element under the finger, such as the result's **Open** link.
+ * The guard takes itself away at that click, or shortly after the press is released.
+ */
+function swallowClick(): void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const stop = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    window.removeEventListener("click", swallow, true);
+    window.removeEventListener("pointerup", released, true);
+    window.removeEventListener("pointercancel", released, true);
+  };
+  const swallow = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    stop();
+  };
+  const released = () => {
+    window.removeEventListener("pointerup", released, true);
+    window.removeEventListener("pointercancel", released, true);
+    timer = setTimeout(stop, CLICK_GUARD_MS);
+  };
+  window.addEventListener("click", swallow, true);
+  window.addEventListener("pointerup", released, true);
+  window.addEventListener("pointercancel", released, true);
 }
 
 function round(value: number): number {
@@ -191,7 +290,9 @@ function pixels(value: string): number {
  * field centers one line of text in its content box, so the baseline comes from the height of a
  * line and the baseline's place in it, which a hidden element in the same font reports.
  */
-function measureField(field: HTMLInputElement): Point & { run: number; size: number } {
+function measureField(
+  field: HTMLInputElement,
+): Point & { run: number; size: number; box: DOMRect } {
   const box = field.getBoundingClientRect();
   const style = window.getComputedStyle(field);
   const left = box.left + pixels(style.borderLeftWidth) + pixels(style.paddingLeft);
@@ -218,6 +319,8 @@ function measureField(field: HTMLInputElement): Point & { run: number; size: num
     y: Math.round(baseline * ratio) / ratio,
     run: right - left,
     size: pixels(style.fontSize),
+    // The tangle keeps its text off the field's box where it can.
+    box,
   };
 }
 
@@ -231,6 +334,60 @@ function measureAdvance(overlay: SVGSVGElement): number {
   const length = probe.getComputedTextLength();
   probe.remove();
   return length / 1000;
+}
+
+// The top of some letters at 100px on one baseline, in the overlay.
+function letterTop(overlay: SVGSVGElement, baseline: string | null): number {
+  const text = document.createElementNS(SVG, "text");
+  text.setAttribute("font-size", "100");
+  text.setAttribute("y", "500");
+  if (baseline !== null) {
+    text.setAttribute("dominant-baseline", baseline);
+  }
+  text.textContent = "Hxg";
+  overlay.appendChild(text);
+  const top = text.getBBox().y;
+  text.remove();
+  return top;
+}
+
+// Measures how far above the baseline the middle of the letters sits, as a share of the font
+// size. The tangle's text is centered on its path, so a strand's letters are as far from the
+// strand on one side as on the other, whichever way up they are.
+function measureCentralShift(overlay: SVGSVGElement): number {
+  return (letterTop(overlay, "central") - letterTop(overlay, null)) / 100;
+}
+
+// The safe area's insets, which are more than zero on a page that extends under a notch, plus
+// the tangle's own inset. A layout viewport of the wide layout gets the frame coil's inset.
+function tangleInsets(): Insets {
+  const probe = document.createElement("div");
+  probe.style.cssText =
+    "position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
+  document.body.appendChild(probe);
+  const style = window.getComputedStyle(probe);
+  const inset = window.matchMedia(WIDE).matches ? INSET : TANGLE_INSET;
+  const side = (value: string) => (Number.parseFloat(value) || 0) + inset;
+  const insets = {
+    top: side(style.paddingTop),
+    right: side(style.paddingRight),
+    bottom: side(style.paddingBottom),
+    left: side(style.paddingLeft),
+  };
+  probe.remove();
+  return insets;
+}
+
+// Brings the field into view, near the bottom of the screen, as the browser does when the
+// visitor types in it.
+function showField(field: HTMLInputElement): void {
+  const box = field.getBoundingClientRect();
+  if (box.top < 0 || box.bottom > window.innerHeight) {
+    window.scrollBy({
+      top: box.bottom - window.innerHeight + FIELD_MARGIN,
+      behavior: "instant",
+    });
+  }
 }
 
 /**
@@ -292,6 +449,13 @@ function onPath(className: string): { text: SVGTextElement; textPath: SVGTextPat
   return { text, textPath };
 }
 
+// Takes the coil's text off the overlay, and leaves the overlay and its path.
+function clearText(overlay: SVGSVGElement): void {
+  for (const child of overlay.querySelectorAll(":scope > g, :scope > text")) {
+    child.remove();
+  }
+}
+
 interface Coil {
   layout: CoilLayout;
   count: number;
@@ -302,65 +466,31 @@ interface Coil {
 }
 
 /**
- * Lays the line out for a fitted window, and returns the coil. `write` shows the first `n`
- * characters, and only ever goes forward. It changes the text of the newest chunk and of the edge,
- * and adds every chunk that the head has reached, which is several in one frame near the end. A
- * finished chunk is never touched again, so the browser repaints a small area in each frame.
- * `complete` moves the last characters from the edge into their chunks, so the edge can fade over
- * them.
+ * Makes the text elements for a laid-out line, whose path is already in the overlay, and returns
+ * the coil. `write` shows the first `n` characters, and only ever goes forward. It changes the
+ * text of the newest chunk and of the edge, and adds every chunk that the head has reached, which
+ * is several in one frame near the end. A finished chunk is never touched again, so the browser
+ * repaints a small area in each frame. `complete` moves the last characters from the edge into
+ * their chunks, so the edge can fade over them.
+ *
+ * The tangle passes `gaps`, the dark cuts that a newer strand makes in an older one, keyed by the
+ * character where each starts, and thins the dark outline under small letters, which a 4px
+ * outline would bury.
  */
-function layCoil({
+function buildCoil({
   overlay,
-  path,
   longLink,
-  view,
-  start,
-  fit,
-  advance,
-  rowLength,
+  layout,
+  gaps,
 }: {
   overlay: SVGSVGElement;
-  path: SVGPathElement;
   longLink: string;
-  view: DOMRect;
-  start: ReturnType<typeof measureField>;
-  fit: CoilFit;
-  advance: number;
-  rowLength: number;
+  layout: CoilLayout;
+  gaps?: ReadonlyMap<number, readonly TangleGap[]>;
 }): Coil {
-  const line = coilPath({
-    width: view.width,
-    height: view.height,
-    start,
-    insets: fit.insets,
-    pitch: fit.pitch,
-    fieldPitch: fit.fieldPitch,
-    laps: fit.laps,
-    radius: RADIUS,
-  });
-  path.setAttribute("d", line.data);
-  const zones = coilZones({
-    pathLength: line.length,
-    lead: line.lead,
-    advance,
-    fieldRun: start.run,
-    fieldSize: start.size,
-    coilSize: fit.size,
-    taperSteps: TAPER_STEPS,
-    taperRun: TAPER_RUN,
-  });
-  const layout = coilLayout({
-    characters: longLink.length,
-    corners: line.corners,
-    zones,
-    advance,
-    fieldSize: start.size,
-    coilSize: fit.size,
-    rowLength,
-    chunkLength: CHUNK_LENGTH,
-  });
   const { count, sizes, offsets, chunks } = layout;
-  const sizeAt = (index: number) => sizes[index] ?? fit.size;
+  const sizeAt = (index: number) => sizes[index] ?? 0;
+  const thin = gaps !== undefined;
 
   const edge = onPath("coil-edge");
   const edgeRuns: {
@@ -390,6 +520,17 @@ function layCoil({
     }
     const { text, textPath } = onPath(chunk.plain ? "coil-chunk" : "coil-chunk coil-halo");
     text.setAttribute("font-size", String(chunk.size));
+    if (thin && !chunk.plain) {
+      text.setAttribute("stroke-width", String(haloFor(chunk.size)));
+    }
+    // A gap goes under the strand that makes it and over everything older.
+    for (const gap of gaps?.get(chunk.from) ?? []) {
+      const cut = document.createElementNS(SVG, "path");
+      cut.setAttribute("class", "coil-gap");
+      cut.setAttribute("d", gap.data);
+      cut.setAttribute("stroke-width", String(gap.width));
+      group.appendChild(cut);
+    }
     textPath.setAttribute("startOffset", String(round(chunk.offset)));
     const node = document.createTextNode("");
     textPath.appendChild(node);
@@ -443,17 +584,102 @@ function layCoil({
 
   let shown = -1;
   const write = (n: number) => {
-    if (n === shown) {
+    const at = Math.min(n, count);
+    if (at === shown) {
       return;
     }
-    shown = n;
-    const lit = Math.max(0, n - EDGE_LENGTH);
+    shown = at;
+    const lit = Math.max(0, at - EDGE_LENGTH);
     fillTo(lit);
-    writeEdge(lit, n);
+    writeEdge(lit, at);
   };
   const complete = () => fillTo(count);
 
   return { layout, count, groups, edge: edge.text, write, complete };
+}
+
+/**
+ * Fits the frame coil to the window and lays the link out on it, or returns `null`, with the
+ * overlay as it was, when the link doesn't fit. The frame coil runs around the window, so it
+ * needs a home page that the window holds whole, which puts the page's frame at the window's edge
+ * and the field over the bottom lanes.
+ */
+function layFrameCoil({
+  overlay,
+  path,
+  field,
+  longLink,
+  advance,
+}: {
+  overlay: SVGSVGElement;
+  path: SVGPathElement;
+  field: HTMLInputElement;
+  longLink: string;
+  advance: number;
+}): Coil | null {
+  const view = overlay.getBoundingClientRect();
+  const start = measureField(field);
+  const fit = fitCoil({
+    width: view.width,
+    height: view.height,
+    start,
+    characters: longLink.length,
+    advance,
+    fieldRun: start.run,
+    fieldSize: start.size,
+    inset: INSET,
+    radius: RADIUS,
+    depth: Math.min(
+      view.height - INSET - start.y - CLEARANCE_UNDER,
+      start.x - INSET - CLEARANCE_LEFT,
+    ),
+    minLaps: MIN_LAPS,
+    maxLaps: MAX_LAPS,
+    minSize: MIN_SIZE,
+    maxSize: MAX_SIZE,
+    pitchRatio: PITCH_RATIO,
+    minPitchRatio: MIN_PITCH_RATIO,
+    taperSteps: TAPER_STEPS,
+    taperRun: TAPER_RUN,
+  });
+  if (fit === null) {
+    return null;
+  }
+  const line = coilPath({
+    width: view.width,
+    height: view.height,
+    start,
+    insets: fit.insets,
+    pitch: fit.pitch,
+    fieldPitch: fit.fieldPitch,
+    laps: fit.laps,
+    radius: RADIUS,
+  });
+  const zones = coilZones({
+    pathLength: line.length,
+    lead: line.lead,
+    advance,
+    fieldRun: start.run,
+    fieldSize: start.size,
+    coilSize: fit.size,
+    taperSteps: TAPER_STEPS,
+    taperRun: TAPER_RUN,
+  });
+  const layout = coilLayout({
+    characters: longLink.length,
+    corners: line.corners,
+    zones,
+    advance,
+    fieldSize: start.size,
+    coilSize: fit.size,
+    rowLength: measureRowLength(longLink, advance),
+    chunkLength: CHUNK_LENGTH,
+  });
+  if (layout.count < longLink.length) {
+    return null;
+  }
+  path.setAttribute("d", line.data);
+  return buildCoil({ overlay, longLink, layout });
 }
 
 /**
@@ -510,14 +736,45 @@ function countFigures(result: HTMLElement, format: CoilOptions["figures"]) {
   return { show, settle };
 }
 
+// The latest time on the coil's clock at which the head is still at or before character
+// `stop`, found by halving a range, because the typing curve has no simple inverse here.
+function lastMomentAt(stop: number, length: number): number {
+  let low = 0;
+  let high = COIL_MS;
+  for (let pass = 0; pass < 40; pass += 1) {
+    const middle = (low + high) / 2;
+    if (Math.round(length * typedShare(middle / COIL_MS)) <= stop) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return low;
+}
+
+// The tangle while it's being worked out and once it's ready. `hold` is the moment on the coil's
+// clock at which the head reaches the end of the field, where it waits until the tangle is ready.
+interface Tangle {
+  width: number;
+  height: number;
+  fieldCount: number;
+  hold: number;
+  work: Generator<undefined, TangleFit | null> | null;
+  fit: TangleFit | null;
+  centralShift: number;
+}
+
 /**
  * Starts the coil, or returns `null`, with nothing changed, when it can't play here: in a hidden
- * tab, in a window narrower than the wide layout, on a home page taller than the window, with a
- * visitor's link that has characters outside printable ASCII, with a long link that doesn't fit
- * on the coil, before the fixed-width face has loaded, in a browser that lacks an API that the
- * coil uses, or on any failure. The page then shows the result without the coil. Call it before
- * the browser paints the page that has the new result, so the first frame shows the home page as
- * the visitor left it.
+ * tab, with a visitor's link that has characters outside printable ASCII, before the fixed-width
+ * face has loaded, in a browser that lacks an API that the coil uses, or on any failure. The page
+ * then shows the result without the coil. Call it before the browser paints the page that has the
+ * new result, so the first frame shows the home page as the visitor left it.
+ *
+ * The frame coil plays on a window at least as wide as the wide layout that holds the whole home
+ * page, when the link fits on it. The tangle plays everywhere else. The tangle is worked out in
+ * short slices between frames while the head types in the field, and the head waits at the end of
+ * the field until it's ready.
  *
  * Any key or pointer press while the coil plays skips it, and the page shows the result at rest.
  */
@@ -525,14 +782,10 @@ export function startCoil(options: CoilOptions): CoilRun | null {
   const { home, field, longLink } = options;
   // A hidden tab paints no frames and sends no `visibilitychange` until the visitor comes back,
   // so a coil started there would play in full on their return.
-  if (document.hidden || !supported() || !window.matchMedia(WIDE).matches) {
+  if (document.hidden || !supported()) {
     return null;
   }
   if (!PRINTABLE_ASCII.test(field.value)) {
-    return null;
-  }
-  const root = document.documentElement;
-  if (root.scrollHeight > root.clientHeight) {
     return null;
   }
   // The coil's text and the field's text are in the same face, and nothing can be measured
@@ -543,6 +796,11 @@ export function startCoil(options: CoilOptions): CoilRun | null {
       `${fieldStyle.fontWeight} ${fieldStyle.fontSize} ${fieldStyle.fontFamily}`,
     )
   ) {
+    return null;
+  }
+  const root = document.documentElement;
+  const frameFits = window.matchMedia(WIDE).matches && root.scrollHeight <= root.clientHeight;
+  if (!frameFits && !tangleSupported()) {
     return null;
   }
 
@@ -569,18 +827,28 @@ export function startCoil(options: CoilOptions): CoilRun | null {
   status.className = "coil-status";
   status.setAttribute("role", "status");
   let announceTimer: ReturnType<typeof setTimeout> | null = null;
+  // The tangle, when it plays, and the channel that runs the slices of its growth.
+  let tangle: Tangle | null = null;
+  let channel: MessageChannel | null = null;
 
   const onVisibilityChange = () => {
     if (document.hidden) {
       drop();
     }
   };
-  const onResize = () => drop();
+  const onResize = () => {
+    if (tangle === null) {
+      drop();
+    } else {
+      resizeTangle(tangle);
+    }
+  };
   // Any press skips the coil, and the result appears at rest under the pointer and the focus in
   // the same event, so the press mustn't also act on the result. The default action of a pointer
   // press would move the focus off the result's heading. The pointer is captured by the body
   // until it's released, so the browser sends the press's click to the body, not to a button or
-  // a link of the result that's now under the pointer.
+  // a link of the result that's now under the pointer. A touch's click ignores the capture, so
+  // that click is swallowed too.
   const onPointerDown = (event: PointerEvent) => {
     event.preventDefault();
     try {
@@ -588,6 +856,7 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     } catch {
       // A pointer that's no longer pressed can't be captured, and it sends no click either.
     }
+    swallowClick();
     drop();
   };
   // The default action of a key would act on the focus, which is about to be the result's
@@ -607,10 +876,13 @@ export function startCoil(options: CoilOptions): CoilRun | null {
       cancelAnimationFrame(frameRequest);
       frameRequest = 0;
     }
+    stopTangleWork();
     window.removeEventListener("resize", onResize);
     window.removeEventListener("pointerdown", onPointerDown, true);
     window.removeEventListener("keydown", onKeyDown, true);
     document.removeEventListener("visibilitychange", onVisibilityChange);
+    document.removeEventListener("wheel", preventScroll);
+    document.removeEventListener("touchmove", preventScroll);
     if (announceTimer !== null) {
       clearTimeout(announceTimer);
       announceTimer = null;
@@ -625,13 +897,22 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     }
     animations.length = 0;
     overlay.remove();
-    document.body.classList.remove("coil-running", "coil-dim", "coil-held");
+    document.body.classList.remove("coil-running", "coil-dim", "coil-held", "coil-pinned");
     home.classList.remove("coil-dimmed", "coil-leaving");
     home.style.height = "";
+    home.style.transform = "";
     if (!homeStyled) {
       home.removeAttribute("style");
     }
     field.value = visitorLink;
+  }
+
+  // The tangle's page was scrolled to the field, and the result starts at the top, as a new page
+  // would, with its heading in view.
+  function toTop() {
+    if (tangle !== null) {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
   }
 
   // Stops the run early and has the page show the result at rest.
@@ -641,46 +922,188 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     }
     clear();
     options.onDropped();
+    toTop();
   }
 
-  let coil: Coil;
+  // Gives up on a tangle that holds no link, and has the page show the result as it does without
+  // the coil.
+  function abandon() {
+    if (over) {
+      return;
+    }
+    clear();
+    options.onAbandoned();
+    toTop();
+  }
+
+  // Stops the slices of the tangle's growth.
+  function stopTangleWork() {
+    if (tangle !== null) {
+      tangle.work?.return(null);
+      tangle.work = null;
+    }
+    if (channel !== null) {
+      // A closed port drops the message that's on its way and calls nothing more.
+      channel.port1.close();
+      channel.port2.close();
+      channel = null;
+    }
+  }
+
+  // The coil that's drawn now, and how many characters it shows. The tangle replaces its coil
+  // when it's ready, and again when the screen's height changes while the head is in the field.
+  let coil: Coil | null = null;
+  let shown = 0;
+  let advance = 0;
+  let rowLength = 0;
+
+  // Measures the screen and the field, draws the field's part of the tangle, and starts growing
+  // the rest of it in slices. The keyboard has usually been open, and it closes when the field
+  // loses focus.
+  function prepareTangle(centralShift: number): Tangle | null {
+    stopTangleWork();
+    field.blur();
+    showField(field);
+    const width = root.clientWidth;
+    const height = window.innerHeight;
+    const input = measureField(field);
+    const plan = planTangle({
+      width,
+      height,
+      insets: tangleInsets(),
+      start: { x: input.x, y: input.y - centralShift * input.size },
+      fieldRun: input.run,
+      fieldSize: input.size,
+      advance,
+    });
+    if (plan.fieldCount < 1) {
+      return null;
+    }
+    const line = fieldLine({
+      plan,
+      fieldSize: input.size,
+      advance,
+      rowLength,
+      chunkLength: CHUNK_LENGTH,
+    });
+    clearText(overlay);
+    path.setAttribute("d", line.data);
+    coil = buildCoil({ overlay, longLink, layout: line.layout });
+    coil.write(shown);
+    const work = fitTangle({
+      plan,
+      fieldSize: input.size,
+      characters: longLink.length,
+      box: input.box,
+      seed: hashSeed(longLink),
+      advance,
+      rowLength,
+      chunkLength: CHUNK_LENGTH,
+    });
+    const prepared: Tangle = {
+      width,
+      height,
+      fieldCount: plan.fieldCount,
+      hold: lastMomentAt(plan.fieldCount, longLink.length),
+      work,
+      fit: null,
+      centralShift,
+    };
+    channel = new MessageChannel();
+    const port = channel.port2;
+    // A message on a channel is a task of its own, so the browser can paint a frame between two
+    // slices, and unlike a timer it isn't held back to a few milliseconds apart.
+    channel.port1.addEventListener("message", () => {
+      if (!over && prepared.work !== null && growTangle(prepared)) {
+        port.postMessage(null);
+      }
+    });
+    channel.port1.start();
+    port.postMessage(null);
+    return prepared;
+  }
+
+  // Runs one slice of the tangle's growth. Returns true when there's more to do. When the tangle
+  // is ready, its coil takes over from the field's, at the same character.
+  function growTangle(growing: Tangle): boolean {
+    const work = growing.work;
+    if (work === null) {
+      return false;
+    }
+    try {
+      const end = performance.now() + SLICE_MS;
+      let step = work.next();
+      while (step.done !== true && performance.now() < end) {
+        step = work.next();
+      }
+      if (step.done !== true) {
+        return true;
+      }
+      growing.work = null;
+      const fitted = step.value;
+      if (fitted === null) {
+        abandon();
+        return false;
+      }
+      clearText(overlay);
+      path.setAttribute("d", fitted.data);
+      coil = buildCoil({ overlay, longLink, layout: fitted.layout, gaps: fitted.gaps });
+      coil.write(shown);
+      growing.fit = fitted;
+      return false;
+    } catch {
+      drop();
+      return false;
+    }
+  }
+
+  // A rotation or any change of width drops the tangle, as a resize drops the frame coil. A
+  // change of height alone comes from the keyboard or the browser's toolbar: while the head is in
+  // the field, the tangle is worked out again for the new height, and after that it carries on.
+  function resizeTangle(current: Tangle) {
+    if (root.clientWidth !== current.width) {
+      drop();
+      return;
+    }
+    if (window.innerHeight === current.height || completedAt !== null) {
+      return;
+    }
+    if (current.fit !== null && shown > current.fieldCount) {
+      return;
+    }
+    try {
+      tangle = prepareTangle(current.centralShift);
+      if (tangle === null) {
+        drop();
+      }
+    } catch {
+      drop();
+    }
+  }
+
   try {
     document.body.appendChild(overlay);
-    const advance = measureAdvance(overlay);
-    const view = overlay.getBoundingClientRect();
-    const start = measureField(field);
-    const fit = fitCoil({
-      width: view.width,
-      height: view.height,
-      start,
-      characters: longLink.length,
-      advance,
-      fieldRun: start.run,
-      fieldSize: start.size,
-      inset: INSET,
-      radius: RADIUS,
-      depth: Math.min(
-        view.height - INSET - start.y - CLEARANCE_UNDER,
-        start.x - INSET - CLEARANCE_LEFT,
-      ),
-      minLaps: MIN_LAPS,
-      maxLaps: MAX_LAPS,
-      minSize: MIN_SIZE,
-      maxSize: MAX_SIZE,
-      pitchRatio: PITCH_RATIO,
-      minPitchRatio: MIN_PITCH_RATIO,
-      taperSteps: TAPER_STEPS,
-      taperRun: TAPER_RUN,
-    });
-    if (fit === null || !(advance > 0)) {
+    advance = measureAdvance(overlay);
+    if (!(advance > 0)) {
       clear();
       return null;
     }
-    const rowLength = measureRowLength(longLink, advance);
-    coil = layCoil({ overlay, path, longLink, view, start, fit, advance, rowLength });
-    if (coil.count < longLink.length) {
-      clear();
-      return null;
+    rowLength = measureRowLength(longLink, advance);
+    coil = frameFits ? layFrameCoil({ overlay, path, field, longLink, advance }) : null;
+    if (coil === null) {
+      if (!tangleSupported()) {
+        clear();
+        return null;
+      }
+      overlay.classList.add("coil-phone");
+      tangle = prepareTangle(measureCentralShift(overlay));
+      if (tangle === null) {
+        clear();
+        return null;
+      }
+      document.body.classList.add("coil-pinned");
+      document.addEventListener("wheel", preventScroll, { passive: false });
+      document.addEventListener("touchmove", preventScroll, { passive: false });
     }
     // Everything that fades has its compositor layer from the start of the run, so the browser
     // doesn't make and paint six layers in the frame where the fade starts.
@@ -719,7 +1142,6 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     return null;
   }
 
-  const { layout } = coil;
   // Blanks the visitor's link in the field up to the head, so the long link overwrites it cell
   // for cell. A space is as wide as any other character in the field's face.
   let blanked = 0;
@@ -731,9 +1153,11 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     }
   };
 
-  // The run's moments, in the time of `requestAnimationFrame`. The first frame sets the start,
-  // because a frame's time can be earlier than the moment that the run began.
-  let startedAt: number | null = null;
+  // The run's clock, in milliseconds of the coil's time. It follows the time of
+  // `requestAnimationFrame` from the first frame, because a frame's time can be earlier than the
+  // moment that the run began, and it stands still while the head waits for the tangle.
+  let clock = 0;
+  let lastFrame: number | null = null;
   let dimmed = false;
   let completedAt: number | null = null;
   // Frames painted since the finale was set up. The browser has painted the setup by the second.
@@ -742,12 +1166,15 @@ export function startCoil(options: CoilOptions): CoilRun | null {
 
   const frame = (now: number) => {
     frameRequest = 0;
-    if (over) {
+    if (over || coil === null) {
       return;
     }
     try {
-      startedAt ??= now;
-      const elapsed = now - startedAt;
+      clock += lastFrame === null ? 0 : now - lastFrame;
+      lastFrame = now;
+      if (tangle !== null && tangle.fit === null) {
+        clock = Math.min(clock, tangle.hold);
+      }
       if (finale !== null && finaleStartedAt !== null) {
         const since = now - finaleStartedAt;
         finale.follow(since);
@@ -756,16 +1183,16 @@ export function startCoil(options: CoilOptions): CoilRun | null {
           return;
         }
       } else {
-        const n = Math.round(coil.count * typedShare(elapsed / COIL_MS));
-        coil.write(n);
-        overwrite(n);
+        shown = Math.round(longLink.length * typedShare(clock / COIL_MS));
+        coil.write(shown);
+        overwrite(shown);
         // The page makes room when the head leaves the field, not before.
-        if (!dimmed && n > layout.fieldCount) {
+        if (!dimmed && shown > coil.layout.fieldCount) {
           dimmed = true;
           document.body.classList.add("coil-dim");
           home.classList.add("coil-dimmed");
         }
-        if (completedAt === null && elapsed >= COIL_MS) {
+        if (completedAt === null && clock >= COIL_MS) {
           completedAt = now;
           coil.complete();
           animations.push(
@@ -775,7 +1202,7 @@ export function startCoil(options: CoilOptions): CoilRun | null {
         }
         if (finale !== null) {
           stagedFrames += 1;
-          if (stagedFrames >= 2 && elapsed >= COIL_MS + HOLD_MS) {
+          if (stagedFrames >= 2 && clock >= COIL_MS + HOLD_MS) {
             finale.start();
             finaleStartedAt = now;
           }
@@ -798,21 +1225,37 @@ export function startCoil(options: CoilOptions): CoilRun | null {
     finale?.settle();
     clear();
     options.onLanded();
+    toTop();
   }
 
   frameRequest = requestAnimationFrame(frame);
 
   return {
     land(result) {
-      if (over || finale !== null || completedAt === null) {
+      if (over || finale !== null || completedAt === null || coil === null) {
         return false;
       }
       try {
-        finale = stageFinale({ coil, result, home, overlay, path, longLink, options, animations });
+        const fit = tangle?.fit ?? null;
+        finale = stageFinale({
+          coil,
+          result,
+          home,
+          overlay,
+          pointAt:
+            fit === null
+              ? (along) => path.getPointAtLength(along)
+              : (along) => tanglePoint(fit.walk, along),
+          camera: tangle === null ? null : { centralShift: tangle.centralShift },
+          longLink,
+          options,
+          animations,
+        });
         stagedFrames = 0;
         return true;
       } catch {
         clear();
+        toTop();
         return false;
       }
     },
@@ -835,12 +1278,19 @@ export function startCoil(options: CoilOptions): CoilRun | null {
  * finale, the home page fades out, the result fades in as one group, and each line takes its
  * piece's place in a short fade and flies home. Rows leave in reading order, so the coil unwinds
  * from the field outward and the well fills from the top. Only `transform` and `opacity` animate.
+ * `pointAt` gives the point on the coil's line at a distance along it.
  *
  * The lines fly over the result's background and the well, and behind the result's heading,
  * figures, buttons, and table, so they're inside the result, between its layers. An element that
  * fades is one layer, and the lines would fade with it, so the result can't fade as a whole. Its
  * parts fade together instead, and an element of its own draws its background for the length of
  * the finale.
+ *
+ * The tangle passes `camera`. Its text sits centered on the line, and its page moves: the result
+ * starts at the top of the page, as a new page would, and the page starts raised so the well's
+ * rows land in view, then lowers to the top as the figures finish. Everything that belongs to the
+ * page moves together, the coil that's still waiting with it, so a row's start never parts from
+ * its piece of the coil.
  *
  * Returns the `total` duration, `start`, `follow`, which keeps the figures and the landed lines in
  * step with a moment in the finale, `settle`, which hands the link over to the well's own text,
@@ -851,7 +1301,8 @@ function stageFinale({
   result,
   home,
   overlay,
-  path,
+  pointAt,
+  camera,
   longLink,
   options,
   animations,
@@ -860,7 +1311,8 @@ function stageFinale({
   result: HTMLElement;
   home: HTMLElement;
   overlay: SVGSVGElement;
-  path: SVGPathElement;
+  pointAt: (along: number) => Point;
+  camera: { centralShift: number } | null;
   longLink: string;
   options: CoilOptions;
   animations: Animation[];
@@ -886,12 +1338,18 @@ function stageFinale({
     if (well === null) {
       throw new Error("The result has no well.");
     }
-    const homeHeight = home.getBoundingClientRect().height;
-    home.style.height = `${homeHeight}px`;
+    const homeBox = home.getBoundingClientRect();
+    home.style.height = `${homeBox.height}px`;
     home.classList.add("coil-leaving");
-    // The page is now as tall as the result. Until the motion starts, the frame and the footer
-    // stay where the window's edge puts them.
-    document.body.classList.add("coil-held");
+    if (camera === null) {
+      // The page is now as tall as the result. Until the motion starts, the frame and the footer
+      // stay where the window's edge puts them.
+      document.body.classList.add("coil-held");
+    } else {
+      // The home page keeps its place on the screen while it fades, whatever the scroll was.
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      home.style.transform = `translateY(${homeBox.top - home.getBoundingClientRect().top}px)`;
+    }
 
     const wellStyle = window.getComputedStyle(well);
     const wellSize = Number.parseFloat(wellStyle.fontSize);
@@ -937,6 +1395,11 @@ function stageFinale({
     const inkTop = characterBox(probeText, 0).top - probeTop;
     const baseline = mark.getBoundingClientRect().bottom - probeTop;
     probe.remove();
+    // The line that is matched to the coil: the baseline on the frame coil, and the middle of the
+    // letters on the tangle, whose text sits centered on its line.
+    const anchor = camera === null ? baseline : baseline - camera.centralShift * wellSize;
+    // How far the page starts raised, so the well's top edge starts near the top of the screen.
+    const lift = camera === null ? 0 : Math.max(0, well.getBoundingClientRect().top - CAMERA_TOP);
 
     const rows = Math.ceil(layout.count / layout.rowLength);
     const stagger = Math.min(STAGGER_MS, (FINALE_MS - FLIGHT_MS) / Math.max(1, rows - 1));
@@ -966,16 +1429,16 @@ function stageFinale({
       // The line is straight and the coil isn't, so the line is matched to the coil at the
       // piece's middle character, which is on the straight part of the piece.
       const middle = Math.floor((piece.from + piece.to - 1) / 2);
-      const here = path.getPointAtLength(layout.offsets[middle] ?? 0);
-      const there = path.getPointAtLength(layout.offsets[middle + 1] ?? 0);
+      const here = pointAt(layout.offsets[middle] ?? 0);
+      const there = pointAt(layout.offsets[middle + 1] ?? 0);
       const turn = Math.atan2(there.y - here.y, there.x - here.x);
       const scale = (layout.sizes[middle] ?? wellSize) / wellSize;
-      // The line turns and shrinks about the middle of its letters' baseline, so a long line
-      // spins in place as it travels and doesn't sweep across the page like a clock's hand.
+      // The line turns and shrinks about the middle of its letters, so a long line spins in
+      // place as it travels and doesn't sweep across the page like a clock's hand.
       const half = ((piece.to - piece.from) * wellAdvance) / 2;
       const back = ((middle - piece.from) * wellAdvance - half) * scale;
       const x = overlayBox.left + here.x - Math.cos(turn) * back - (left + half);
-      const y = overlayBox.top + here.y - Math.sin(turn) * back - (top + baseline);
+      const y = overlayBox.top + here.y - Math.sin(turn) * back - (top - lift + anchor);
       // A turn of half a circle either way is the same length. The text on the bottom lanes turns
       // through pointing up.
       let degrees = (turn * 180) / Math.PI;
@@ -1018,7 +1481,7 @@ function stageFinale({
       flyer.textContent = plan.text;
       flyer.style.left = `${plan.left}px`;
       flyer.style.top = `${plan.top}px`;
-      flyer.style.transformOrigin = `${plan.pivot}px ${baseline}px`;
+      flyer.style.transformOrigin = `${plan.pivot}px ${anchor}px`;
       flyers.appendChild(flyer);
 
       const { delay } = plan;
@@ -1036,15 +1499,46 @@ function stageFinale({
         finaleAnimations.push(group.animate({ opacity: [1, 0] }, { ...fade, fill: "forwards" }));
       }
     }
+
+    // The camera. It starts to lower once the first rows are home, and the page's frame rides
+    // with the page, as it will be when the page settles.
+    const pan = { delay: Math.min(PAN_DELAY_MS, total / 2), easing: PAN_EASING };
+    const raised = { transform: [`translateY(${-lift}px)`, "translateY(0px)"] };
+    if (camera !== null) {
+      const timing = { ...pan, duration: total - pan.delay };
+      const header = document.querySelector(".site-header");
+      finaleAnimations.push(
+        result.animate(raised, { ...timing, fill: "backwards" }),
+        overlay.animate(
+          { transform: ["translateY(0px)", `translateY(${lift}px)`] },
+          { ...timing, fill: "both" },
+        ),
+      );
+      if (header !== null) {
+        finaleAnimations.push(header.animate(raised, { ...timing, fill: "backwards" }));
+      }
+    }
     for (const animation of finaleAnimations) {
       animation.pause();
       animations.push(animation);
     }
 
     // Starts every animation at the same moment. The page's frame and footer go to their places
-    // on the taller page, and the header and the footer come back with the result.
+    // on the taller page, and the header and the footer come back with the result. The tangle's
+    // frame, which was pinned to the screen, takes its place on the raised page here and not
+    // while the coil holds still, where it would leave the screen.
     const start = () => {
-      document.body.classList.remove("coil-held", "coil-dim");
+      document.body.classList.remove("coil-held", "coil-dim", "coil-pinned");
+      if (camera !== null) {
+        animations.push(
+          document.body.animate(raised, {
+            ...pan,
+            duration: total - pan.delay,
+            fill: "backwards",
+            pseudoElement: "::before",
+          }),
+        );
+      }
       const at = document.timeline.currentTime;
       for (const animation of finaleAnimations) {
         animation.startTime = at;

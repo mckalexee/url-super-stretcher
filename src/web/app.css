@@ -1215,6 +1215,28 @@ main.coil-arriving {
   filter: drop-shadow(0 0 5px #ffcf4d);
 }
 
+/*
+ * The tangle, the coil's form where the frame coil doesn't fit. Its text sits centered on its
+ * path, so a strand's letters are as far from the strand on one side as on the other, whichever
+ * way up they are. A gap is the dark cut that a newer strand makes in an older one where it
+ * crosses, drawn under the newer strand's letters. The page's frame is pinned to the screen for
+ * the run, so the text runs inside the frame whatever the scroll, and the script lets it go as the
+ * finale starts.
+ */
+.coil-overlay.coil-phone text {
+  dominant-baseline: central;
+}
+
+.coil-overlay .coil-gap {
+  fill: none;
+  stroke: var(--black);
+  stroke-linecap: round;
+}
+
+body.coil-pinned::before {
+  position: fixed;
+}
+
 /* The well holds the whole link from the first frame, unseen, so it never changes size. Its own
    text shows when the last row has landed on it. */
 .long-link.coil-waiting {

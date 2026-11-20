@@ -544,6 +544,11 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
               onComplete: () => setCoil((current) => current && { ...current, phase: "landing" }),
               onLanded: rest,
               onDropped: rest,
+              // The result arrives as it does when the coil doesn't play, so it types in its box.
+              onAbandoned: () => {
+                run.current = null;
+                flushSync(() => setCoil(null));
+              },
             })
           : null;
       setCoil(run.current === null ? null : { ...coil, phase: "writing" });

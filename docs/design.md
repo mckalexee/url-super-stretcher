@@ -143,22 +143,36 @@ paints it.
 After a stretch without a page load, the long link arrives in one of two ways.
 `src/web/routes/home.tsx` decides which.
 
-- **The coil.** From the home page's form, on a window at least 900px wide that holds the whole
-  home page without scrolling, the long link types over the visitor's link in the field, runs out
-  of the field, and coils around the inside of the page's gold frame. The result then takes the
-  home page's place, and the link flies into the result's box row by row. `src/web/coil.ts` draws
-  it, `src/web/coil-geometry.ts` holds its arithmetic, and the section "The coil" in `app.css`
-  styles it. The owner approved the prototype, `design/motion/coil.html`.
-- **The typing.** When the coil doesn't play, for example on a narrow window, from the form under
-  a result, or when the link doesn't fit the coil, the result fades in and the long link types over
-  the visitor's link in the result's box. `useTyping` in `home.tsx` runs it.
+- **The coil.** From the home page's form, the long link types over the visitor's link in the
+  field and runs out of the field in one of two forms. The result then takes the home page's
+  place, and the link flies into the result's box row by row. `src/web/coil.ts` draws both forms,
+  `src/web/coil-geometry.ts` and `src/web/coil-tangle.ts` hold their arithmetic, and the section
+  "The coil" in `app.css` styles them. The owner approved both in the prototype,
+  `design/motion/coil.html`, where the tangle is `variant=tangle`.
+  - **The frame coil** plays on a window at least 900px wide that holds the whole home page
+    without scrolling, when the link fits on it. The link coils around the inside of the page's
+    gold frame.
+  - **The tangle** plays everywhere else: on a narrower window, on a home page taller than the
+    window, or when the link doesn't fit the frame coil. The link leaves the field as one cord
+    that loops and crosses itself across the screen and gets smaller as it piles up. The cord is
+    grown by a walk seeded from the link, so each link gets its own tangle, and the walk is worked
+    out in slices between frames while the first characters type in the field. When it isn't
+    ready, the head waits at the end of the field. The tangle is drawn against the screen, so the
+    page scrolls to the field first and doesn't scroll while it plays. In the finale, the page
+    starts raised, so the rows land in view, and lowers to the top as the figures finish.
+- **The typing.** When the coil doesn't play, for example from the form under a result, with a
+  visitor's link that has characters outside printable ASCII, or when the tangle finds no way to
+  hold the link, the result fades in and the long link types over the visitor's link in the
+  result's box. `useTyping` in `home.tsx` runs it.
 
 Both type on the curve in `src/web/typing.ts`, which starts slow and speeds up. The whole link is
 laid out from the first frame and breaks lines at any character, so nothing shifts while it
 types, and one clock drives the link and the figures, so they agree in every frame. The coil's
 timing and sizes are constants at the top of `coil.ts`, and the fades are custom properties in
 "The coil". A pause in the middle sends the link to rest for good. The coil also drops to the
-result at rest on a hidden tab, a resize, or a failure, and any key or pointer press skips it.
+result at rest on a hidden tab, a resize, or a failure, and any key or pointer press skips it. The
+tangle survives a change of height alone, which a phone's keyboard or toolbar makes: it's worked
+out again while the head is in the field, and carries on after that. A change of width drops it.
 While the coil plays, a live region announces the button's pending label to screen readers.
 
 ### Change the motion

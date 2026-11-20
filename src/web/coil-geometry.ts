@@ -383,6 +383,38 @@ export function coilLayout({
   for (let cut = fieldCount + run * 3; cut < Math.min(taperEnd, count); cut += run * 3) {
     cuts.add(cut);
   }
+  return divideLine({ count, fieldCount, rowLength, sizes, offsets, cuts, corners, chunkLength });
+}
+
+/**
+ * Divides a laid-out line into pieces and chunks, as `coilLayout()` describes them. `sizes` and
+ * `offsets` give each character's size and its distance along the line, with one more offset for
+ * the end of the last character. `cuts` holds the characters where a piece must start, and the
+ * character that straddles each distance in `corners` starts one too. A chunk also starts at each
+ * character in `breaks`, which doesn't start a piece: the tangle uses it so that the dark gap at a
+ * crossing appears when the head reaches it.
+ */
+export function divideLine({
+  count,
+  fieldCount,
+  rowLength,
+  sizes,
+  offsets,
+  cuts,
+  corners,
+  chunkLength,
+  breaks,
+}: {
+  count: number;
+  fieldCount: number;
+  rowLength: number;
+  sizes: Float64Array;
+  offsets: Float64Array;
+  cuts: Set<number>;
+  corners: readonly number[];
+  chunkLength: number;
+  breaks?: ReadonlySet<number>;
+}): CoilLayout {
   const at = (index: number) => offsets[index] ?? 0;
   let reached = 0;
   for (const corner of corners) {
@@ -403,13 +435,18 @@ export function coilLayout({
     pieces.push({ from, to, row: Math.floor(from / rowLength) });
     for (let first = from; first < to;) {
       let stop = first + 1;
-      while (stop < to && stop - first < chunkLength && sizes[stop] === sizes[first]) {
+      while (
+        stop < to &&
+        stop - first < chunkLength &&
+        sizes[stop] === sizes[first] &&
+        breaks?.has(stop) !== true
+      ) {
         stop += 1;
       }
       chunks.push({
         from: first,
         to: stop,
-        size: sizes[first] ?? coilSize,
+        size: sizes[first] ?? 0,
         offset: at(first),
         plain: first < fieldCount,
         piece: index,
